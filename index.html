@@ -38,79 +38,75 @@
 <h2>分析結果</h2>
 <div id="list"></div>
 
-<script>
-  const settingRB = {
-    1: 409,
-    2: 385,
-    3: 356,
-    4: 327,
-    5: 299,
-    6: 273
-  };
+  <script>
+const settingRB = {
+  1: 409,
+  2: 385,
+  3: 356,
+  4: 327,
+  5: 299,
+  6: 273
+};
 
-  let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
+let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-  function estimateSetting(rbRate) {
-    let best = 1;
-    let minDiff = Infinity;
+function estimateSetting(rbRate) {
+  let best = 1;
+  let minDiff = Infinity;
 
-    for (let s in settingRB) {
-      const diff = Math.abs(rbRate - settingRB[s]);
-      if (diff < minDiff) {
-        minDiff = diff;
-        best = s;
-      }
+  for (let s in settingRB) {
+    const diff = Math.abs(rbRate - settingRB[s]);
+    if (diff < minDiff) {
+      minDiff = diff;
+      best = s;
     }
-    return best;
+  }
+  return best;
+}
+
+function saveData() {
+  const machine = Number(document.getElementById("machine").value);
+  const games = Number(document.getElementById("games").value);
+  const bb = Number(document.getElementById("bb").value);
+  const rb = Number(document.getElementById("rb").value);
+
+  if (!machine || !games || !bb || !rb) {
+    alert("全部入力してね");
+    return;
   }
 
-  function saveData() {
-    const machine = Number(machineEl.value);
-    const games = Number(gamesEl.value);
-    const bb = Number(bbEl.value);
-    const rb = Number(rbEl.value);
+  const totalBonus = bb + rb;
+  const bonusRate = Math.round(games / totalBonus);
+  const rbRate = Math.round(games / rb);
+  const setting = estimateSetting(rbRate);
 
-    if (!machine || !games || !bb || !rb) {
-      alert("全部入力してね");
-      return;
-    }
-
-    const totalBonus = bb + rb;
-    const bonusRate = Math.round(games / totalBonus);
-    const rbRate = Math.round(games / rb);
-    const setting = estimateSetting(rbRate);
-
-    data.push({ machine, games, bb, rb, bonusRate, rbRate, setting });
-    localStorage.setItem("hanahanaData", JSON.stringify(data));
-    render();
-
-    machineEl.value = gamesEl.value = bbEl.value = rbEl.value = "";
-  }
-
-  function render() {
-    list.innerHTML = "";
-    data.forEach(d => {
-      const div = document.createElement("div");
-      div.className = "item";
-      div.innerHTML = `
-        <div>台番号：${d.machine}</div>
-        <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-        <div>合算：1/${d.bonusRate}</div>
-        <div>RB：1/${d.rbRate}</div>
-        <div class="setting">推定設定：${d.setting}</div>
-      `;
-      list.appendChild(div);
-    });
-  }
-
-  const machineEl = document.getElementById("machine");
-  const gamesEl = document.getElementById("games");
-  const bbEl = document.getElementById("bb");
-  const rbEl = document.getElementById("rb");
-  const list = document.getElementById("list");
-
+  data.push({ machine, games, bb, rb, bonusRate, rbRate, setting });
+  localStorage.setItem("hanahanaData", JSON.stringify(data));
   render();
+}
+
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach(d => {
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      <div>台番号：${d.machine}</div>
+      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+      <div>合算：1/${d.bonusRate}</div>
+      <div>RB：1/${d.rbRate}</div>
+      <div class="setting">推定設定：${d.setting}</div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+render();
 </script>
+
+
 
 </body>
 </html>
