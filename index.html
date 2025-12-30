@@ -14,7 +14,7 @@
     h1 {
       text-align: center;
     }
-    input, button {
+    select, input, button {
       width: 100%;
       padding: 14px;
       margin-top: 10px;
@@ -48,6 +48,12 @@
 <body>
   <h1>ハナハナ設定判別</h1>
 
+  <!-- 判断モード -->
+  <select id="mode" onchange="render()">
+    <option value="open">営業中モード</option>
+    <option value="close">閉店後モード</option>
+  </select>
+
   <input id="machine" placeholder="台番号" type="number" />
   <input id="games" placeholder="総回転数" type="number" />
   <input id="bb" placeholder="BB回数" type="number" />
@@ -62,6 +68,7 @@
   <script>
     let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
+    // 設定ごとの理論値（簡易）
     const settings = [
       { s: 1, rb: 496, all: 168 },
       { s: 2, rb: 467, all: 163 },
@@ -94,6 +101,7 @@
       render();
     }
 
+    // 設定推定（RB重視＋合算補助）
     function estimateSetting(games, bb, rb) {
       if (rb === 0) return "判別不可";
 
@@ -117,8 +125,27 @@
       return best;
     }
 
+    // 営業中用（甘め）
+    function confidenceOpen(games, rb) {
+      if (games >= 3000 && rb >= 15) return "★★★★★";
+      if (games >= 2500 && rb >= 12) return "★★★★☆";
+      if (games >= 2000 && rb >= 9) return "★★★☆☆";
+      if (games >= 1000 && rb >= 5) return "★★☆☆☆";
+      return "★☆☆☆☆";
+    }
+
+    // 閉店後用（超厳格）
+    function confidenceClose(games, rb) {
+      if (games >= 5000 && rb >= 25) return "★★★★★";
+      if (games >= 4500 && rb >= 22) return "★★★★☆";
+      if (games >= 4000 && rb >= 18) return "★★★☆☆";
+      if (games >= 3000 && rb >= 14) return "★★☆☆☆";
+      return "★☆☆☆☆";
+    }
+
     function render() {
       const list = document.getElementById("list");
+      const mode = document.getElementById("mode").value;
       list.innerHTML = "";
 
       data.forEach(d => {
@@ -126,6 +153,11 @@
         const gassan = totalBonus > 0 ? Math.floor(d.games / totalBonus) : "-";
         const rbRate = d.rb > 0 ? Math.floor(d.games / d.rb) : "-";
         const setting = estimateSetting(d.games, d.bb, d.rb);
+
+        const confidence =
+          mode === "open"
+            ? confidenceOpen(d.games, d.rb)
+            : confidenceClose(d.games, d.rb);
 
         const card = document.createElement("div");
         card.className = "card";
@@ -135,6 +167,7 @@
           <div>合算：1/${gassan}</div>
           <div>RB：1/${rbRate}</div>
           <div class="red">推定設定：${setting}</div>
+          <div>信頼度：${confidence}</div>
         `;
         list.appendChild(card);
       });
