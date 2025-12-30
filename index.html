@@ -5,79 +5,112 @@
   <title>ハナハナ設定分析</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
-    body {
-      font-family: sans-serif;
-      padding: 16px;
-    }
+    body { font-family: sans-serif; padding: 16px; background: #fafafa; }
     input, button {
-      width: 100%;
-      padding: 8px;
-      margin: 6px 0;
-      font-size: 16px;
+      width: 100%; padding: 10px; margin: 6px 0; font-size: 16px;
     }
     button {
-      background: #ff5a5a;
-      color: white;
-      border: none;
-      border-radius: 4px;
+      background: #ff5a5a; color: white; border: none; border-radius: 6px;
     }
     .item {
-      border-bottom: 1px solid #ccc;
-      padding: 8px 0;
+      background: white; border-radius: 6px; padding: 10px;
+      margin: 8px 0; box-shadow: 0 0 4px rgba(0,0,0,0.1);
+    }
+    .setting {
+      font-weight: bold; color: #d60000;
     }
   </style>
 </head>
+
 <body>
 
-  <h1>ハナハナ設定分析</h1>
+<h1>ハナハナ設定分析</h1>
 
-  <h2>台データ入力</h2>
+<h2>台データ入力</h2>
 
-  <input id="machine" type="number" placeholder="台番号">
-  <input id="games" type="number" placeholder="回転数（G）">
-  <input id="bb" type="number" placeholder="BB回数">
-  <input id="rb" type="number" placeholder="RB回数">
+<input id="machine" type="number" placeholder="台番号">
+<input id="games" type="number" placeholder="回転数（G）">
+<input id="bb" type="number" placeholder="BB回数">
+<input id="rb" type="number" placeholder="RB回数">
 
-  <button onclick="saveData()">保存</button>
+<button onclick="saveData()">保存</button>
 
-  <h2>入力済みデータ</h2>
-  <div id="list"></div>
+<h2>分析結果</h2>
+<div id="list"></div>
 
-  <script>
+<script>
+  const settingRB = {
+    1: 409,
+    2: 385,
+    3: 356,
+    4: 327,
+    5: 299,
+    6: 273
+  };
+
   let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
+  function estimateSetting(rbRate) {
+    let best = 1;
+    let minDiff = Infinity;
+
+    for (let s in settingRB) {
+      const diff = Math.abs(rbRate - settingRB[s]);
+      if (diff < minDiff) {
+        minDiff = diff;
+        best = s;
+      }
+    }
+    return best;
+  }
+
   function saveData() {
-    const machine = document.getElementById("machine").value;
-    const games = document.getElementById("games").value;
-    const bb = document.getElementById("bb").value;
-    const rb = document.getElementById("rb").value;
+    const machine = Number(machineEl.value);
+    const games = Number(gamesEl.value);
+    const bb = Number(bbEl.value);
+    const rb = Number(rbEl.value);
 
     if (!machine || !games || !bb || !rb) {
       alert("全部入力してね");
       return;
     }
 
-    data.push({ machine, games, bb, rb });
+    const totalBonus = bb + rb;
+    const bonusRate = Math.round(games / totalBonus);
+    const rbRate = Math.round(games / rb);
+    const setting = estimateSetting(rbRate);
+
+    data.push({ machine, games, bb, rb, bonusRate, rbRate, setting });
     localStorage.setItem("hanahanaData", JSON.stringify(data));
     render();
+
+    machineEl.value = gamesEl.value = bbEl.value = rbEl.value = "";
   }
 
   function render() {
-    const list = document.getElementById("list");
     list.innerHTML = "";
-
     data.forEach(d => {
       const div = document.createElement("div");
       div.className = "item";
-      div.textContent =
-        `台${d.machine} / ${d.games}G / BB:${d.bb} RB:${d.rb}`;
+      div.innerHTML = `
+        <div>台番号：${d.machine}</div>
+        <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+        <div>合算：1/${d.bonusRate}</div>
+        <div>RB：1/${d.rbRate}</div>
+        <div class="setting">推定設定：${d.setting}</div>
+      `;
       list.appendChild(div);
     });
   }
 
+  const machineEl = document.getElementById("machine");
+  const gamesEl = document.getElementById("games");
+  const bbEl = document.getElementById("bb");
+  const rbEl = document.getElementById("rb");
+  const list = document.getElementById("list");
+
   render();
 </script>
-
 
 </body>
 </html>
