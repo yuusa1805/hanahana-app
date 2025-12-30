@@ -1,112 +1,113 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>ハナハナ設定分析</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta charset="UTF-8" />
+  <title>ハナハナ設定判別</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <style>
-    body { font-family: sans-serif; padding: 16px; background: #fafafa; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+    }
     input, button {
-      width: 100%; padding: 10px; margin: 6px 0; font-size: 16px;
+      width: 100%;
+      padding: 14px;
+      margin-top: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
     }
-    button {
-      background: #ff5a5a; color: white; border: none; border-radius: 6px;
+    button.save {
+      background: #ff5a5a;
+      color: white;
+      border: none;
     }
-    .item {
-      background: white; border-radius: 6px; padding: 10px;
-      margin: 8px 0; box-shadow: 0 0 4px rgba(0,0,0,0.1);
+    button.clear {
+      background: #999;
+      color: white;
+      border: none;
     }
-    .setting {
-      font-weight: bold; color: #d60000;
+    .card {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      margin-top: 15px;
+    }
+    .red {
+      color: red;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
+  <h1>ハナハナ設定判別</h1>
 
-<h1>ハナハナ設定分析</h1>
+  <input id="machine" placeholder="台番号" type="number" />
+  <input id="games" placeholder="総回転数" type="number" />
+  <input id="bb" placeholder="BB回数" type="number" />
+  <input id="rb" placeholder="RB回数" type="number" />
 
-<h2>台データ入力</h2>
+  <button class="save" onclick="saveData()">保存</button>
+  <button class="clear" onclick="clearData()">履歴を全削除</button>
 
-<input id="machine" type="number" placeholder="台番号">
-<input id="games" type="number" placeholder="回転数（G）">
-<input id="bb" type="number" placeholder="BB回数">
-<input id="rb" type="number" placeholder="RB回数">
-
-<button onclick="saveData()">保存</button>
-
-<h2>分析結果</h2>
-<div id="list"></div>
+  <h2>分析結果</h2>
+  <div id="list"></div>
 
   <script>
-const settingRB = {
-  1: 409,
-  2: 385,
-  3: 356,
-  4: 327,
-  5: 299,
-  6: 273
-};
+    let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
+    function saveData() {
+      const machine = document.getElementById("machine").value;
+      const games = Number(document.getElementById("games").value);
+      const bb = Number(document.getElementById("bb").value);
+      const rb = Number(document.getElementById("rb").value);
 
-function estimateSetting(rbRate) {
-  let best = 1;
-  let minDiff = Infinity;
+      if (!machine || !games || !bb || !rb) {
+        alert("全部入力してね");
+        return;
+      }
 
-  for (let s in settingRB) {
-    const diff = Math.abs(rbRate - settingRB[s]);
-    if (diff < minDiff) {
-      minDiff = diff;
-      best = s;
+      data.push({ machine, games, bb, rb });
+      localStorage.setItem("hanahanaData", JSON.stringify(data));
+      render();
     }
-  }
-  return best;
-}
 
-function saveData() {
-  const machine = Number(document.getElementById("machine").value);
-  const games = Number(document.getElementById("games").value);
-  const bb = Number(document.getElementById("bb").value);
-  const rb = Number(document.getElementById("rb").value);
+    function clearData() {
+      if (!confirm("履歴を全て削除しますか？")) return;
+      data = [];
+      localStorage.removeItem("hanahanaData");
+      render();
+    }
 
-  if (!machine || !games || !bb || !rb) {
-    alert("全部入力してね");
-    return;
-  }
+    function render() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
 
-  const totalBonus = bb + rb;
-  const bonusRate = Math.round(games / totalBonus);
-  const rbRate = Math.round(games / rb);
-  const setting = estimateSetting(rbRate);
+      data.forEach(d => {
+        const totalBonus = d.bb + d.rb;
+        const gassan = totalBonus > 0 ? Math.floor(d.games / totalBonus) : "-";
+        const rbRate = d.rb > 0 ? Math.floor(d.games / d.rb) : "-";
 
-  data.push({ machine, games, bb, rb, bonusRate, rbRate, setting });
-  localStorage.setItem("hanahanaData", JSON.stringify(data));
-  render();
-}
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <div>台番号：${d.machine}</div>
+          <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+          <div>合算：1/${gassan}</div>
+          <div>RB：1/${rbRate}</div>
+          <div class="red">推定設定：判別中</div>
+        `;
+        list.appendChild(card);
+      });
+    }
 
-function render() {
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  data.forEach(d => {
-    const div = document.createElement("div");
-    div.className = "item";
-    div.innerHTML = `
-      <div>台番号：${d.machine}</div>
-      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-      <div>合算：1/${d.bonusRate}</div>
-      <div>RB：1/${d.rbRate}</div>
-      <div class="setting">推定設定：${d.setting}</div>
-    `;
-    list.appendChild(div);
-  });
-}
-
-render();
-</script>
-
-
-
+    render();
+  </script>
 </body>
 </html>
