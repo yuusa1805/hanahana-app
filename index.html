@@ -62,6 +62,15 @@
   <script>
     let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
+    const settings = [
+      { s: 1, rb: 496, all: 168 },
+      { s: 2, rb: 467, all: 163 },
+      { s: 3, rb: 439, all: 156 },
+      { s: 4, rb: 405, all: 149 },
+      { s: 5, rb: 374, all: 141 },
+      { s: 6, rb: 343, all: 134 }
+    ];
+
     function saveData() {
       const machine = document.getElementById("machine").value;
       const games = Number(document.getElementById("games").value);
@@ -85,6 +94,29 @@
       render();
     }
 
+    function estimateSetting(games, bb, rb) {
+      if (rb === 0) return "判別不可";
+
+      const rbRate = games / rb;
+      const allRate = games / (bb + rb);
+
+      let best = null;
+      let bestScore = Infinity;
+
+      settings.forEach(st => {
+        const rbDiff = Math.abs(rbRate - st.rb);
+        const allDiff = Math.abs(allRate - st.all);
+        const score = rbDiff * 2 + allDiff;
+
+        if (score < bestScore) {
+          bestScore = score;
+          best = st.s;
+        }
+      });
+
+      return best;
+    }
+
     function render() {
       const list = document.getElementById("list");
       list.innerHTML = "";
@@ -93,6 +125,7 @@
         const totalBonus = d.bb + d.rb;
         const gassan = totalBonus > 0 ? Math.floor(d.games / totalBonus) : "-";
         const rbRate = d.rb > 0 ? Math.floor(d.games / d.rb) : "-";
+        const setting = estimateSetting(d.games, d.bb, d.rb);
 
         const card = document.createElement("div");
         card.className = "card";
@@ -101,7 +134,7 @@
           <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
           <div>合算：1/${gassan}</div>
           <div>RB：1/${rbRate}</div>
-          <div class="red">推定設定：判別中</div>
+          <div class="red">推定設定：${setting}</div>
         `;
         list.appendChild(card);
       });
