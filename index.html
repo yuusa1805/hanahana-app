@@ -2,10 +2,78 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>ハナハナ分析</title>
+  <title>ハナハナ設定分析</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 16px;
+    }
+    input, button {
+      width: 100%;
+      padding: 8px;
+      margin: 6px 0;
+      font-size: 16px;
+    }
+    button {
+      background: #ff5a5a;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    .item {
+      border-bottom: 1px solid #ccc;
+      padding: 8px 0;
+    }
+  </style>
 </head>
 <body>
+
   <h1>ハナハナ設定分析</h1>
-  <p>表示テスト成功 🎉</p>
+
+  <h2>台データ入力</h2>
+
+  <input id="machine" type="number" placeholder="台番号">
+  <input id="games" type="number" placeholder="回転数（G）">
+  <input id="bb" type="number" placeholder="BB回数">
+  <input id="rb" type="number" placeholder="RB回数">
+
+  <button onclick="saveData()">保存</button>
+
+  <h2>入力済みデータ</h2>
+  <div id="list"></div>
+
+  <script>
+    let data = [];
+
+    function saveData() {
+      const machine = document.getElementById("machine").value;
+      const games = document.getElementById("games").value;
+      const bb = document.getElementById("bb").value;
+      const rb = document.getElementById("rb").value;
+
+      if (!machine || !games || !bb || !rb) {
+        alert("全部入力してね");
+        return;
+      }
+
+      data.push({ machine, games, bb, rb });
+      render();
+    }
+
+    function render() {
+      const list = document.getElementById("list");
+      list.innerHTML = "";
+
+      data.forEach(d => {
+        const div = document.createElement("div");
+        div.className = "item";
+        div.textContent =
+          `台${d.machine} / ${d.games}G / BB:${d.bb} RB:${d.rb}`;
+        list.appendChild(div);
+      });
+    }
+  </script>
+
 </body>
 </html>
