@@ -37,6 +37,16 @@
       padding: 15px;
       border-radius: 10px;
       margin-top: 15px;
+      border: 2px solid transparent;
+    }
+    .aim {
+      border-color: red;
+      background: #fff0f0;
+    }
+    .aim-label {
+      color: red;
+      font-weight: bold;
+      margin-top: 5px;
     }
     .red {
       color: red;
@@ -48,7 +58,6 @@
 <body>
   <h1>ハナハナ設定判別</h1>
 
-  <!-- 判断モード -->
   <select id="mode" onchange="render()">
     <option value="open">営業中モード</option>
     <option value="close">閉店後モード</option>
@@ -68,7 +77,6 @@
   <script>
     let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-    // 設定ごとの理論値（簡易）
     const settings = [
       { s: 1, rb: 496, all: 168 },
       { s: 2, rb: 467, all: 163 },
@@ -101,14 +109,13 @@
       render();
     }
 
-    // 設定推定（RB重視＋合算補助）
     function estimateSetting(games, bb, rb) {
-      if (rb === 0) return "判別不可";
+      if (rb === 0) return 0;
 
       const rbRate = games / rb;
       const allRate = games / (bb + rb);
 
-      let best = null;
+      let best = 0;
       let bestScore = Infinity;
 
       settings.forEach(st => {
@@ -125,7 +132,6 @@
       return best;
     }
 
-    // 営業中用（甘め）
     function confidenceOpen(games, rb) {
       if (games >= 3000 && rb >= 15) return "★★★★★";
       if (games >= 2500 && rb >= 12) return "★★★★☆";
@@ -134,13 +140,16 @@
       return "★☆☆☆☆";
     }
 
-    // 閉店後用（超厳格）
     function confidenceClose(games, rb) {
       if (games >= 5000 && rb >= 25) return "★★★★★";
       if (games >= 4500 && rb >= 22) return "★★★★☆";
       if (games >= 4000 && rb >= 18) return "★★★☆☆";
       if (games >= 3000 && rb >= 14) return "★★☆☆☆";
       return "★☆☆☆☆";
+    }
+
+    function starCount(stars) {
+      return stars.replace(/☆/g, "").length;
     }
 
     function render() {
@@ -159,8 +168,12 @@
             ? confidenceOpen(d.games, d.rb)
             : confidenceClose(d.games, d.rb);
 
+        const aim =
+          setting >= 4 && starCount(confidence) >= 4;
+
         const card = document.createElement("div");
-        card.className = "card";
+        card.className = "card" + (aim ? " aim" : "");
+
         card.innerHTML = `
           <div>台番号：${d.machine}</div>
           <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
@@ -168,6 +181,7 @@
           <div>RB：1/${rbRate}</div>
           <div class="red">推定設定：${setting}</div>
           <div>信頼度：${confidence}</div>
+          ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
         `;
         list.appendChild(card);
       });
