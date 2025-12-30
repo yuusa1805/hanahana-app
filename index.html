@@ -44,36 +44,40 @@
   <div id="list"></div>
 
   <script>
-    let data = [];
+  let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-    function saveData() {
-      const machine = document.getElementById("machine").value;
-      const games = document.getElementById("games").value;
-      const bb = document.getElementById("bb").value;
-      const rb = document.getElementById("rb").value;
+  function saveData() {
+    const machine = document.getElementById("machine").value;
+    const games = document.getElementById("games").value;
+    const bb = document.getElementById("bb").value;
+    const rb = document.getElementById("rb").value;
 
-      if (!machine || !games || !bb || !rb) {
-        alert("全部入力してね");
-        return;
-      }
-
-      data.push({ machine, games, bb, rb });
-      render();
+    if (!machine || !games || !bb || !rb) {
+      alert("全部入力してね");
+      return;
     }
 
-    function render() {
-      const list = document.getElementById("list");
-      list.innerHTML = "";
+    data.push({ machine, games, bb, rb });
+    localStorage.setItem("hanahanaData", JSON.stringify(data));
+    render();
+  }
 
-      data.forEach(d => {
-        const div = document.createElement("div");
-        div.className = "item";
-        div.textContent =
-          `台${d.machine} / ${d.games}G / BB:${d.bb} RB:${d.rb}`;
-        list.appendChild(div);
-      });
-    }
-  </script>
+  function render() {
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    data.forEach(d => {
+      const div = document.createElement("div");
+      div.className = "item";
+      div.textContent =
+        `台${d.machine} / ${d.games}G / BB:${d.bb} RB:${d.rb}`;
+      list.appendChild(div);
+    });
+  }
+
+  render();
+</script>
+
 
 </body>
 </html>
