@@ -11,9 +11,8 @@
       background: #f5f5f5;
       padding: 20px;
     }
-    h1 {
-      text-align: center;
-    }
+    h1 { text-align: center; }
+
     select, input, button {
       width: 100%;
       padding: 14px;
@@ -22,16 +21,18 @@
       border-radius: 8px;
       border: 1px solid #ccc;
     }
+
     button.save {
       background: #ff5a5a;
       color: white;
       border: none;
     }
     button.clear {
-      background: #999;
+      background: #888;
       color: white;
       border: none;
     }
+
     .card {
       background: white;
       padding: 15px;
@@ -46,12 +47,10 @@
     .aim-label {
       color: red;
       font-weight: bold;
-      margin-top: 5px;
+      margin-top: 6px;
     }
-    .red {
-      color: red;
-      font-weight: bold;
-    }
+    .red { color: red; font-weight: bold; }
+    .gray { color: #777; }
   </style>
 </head>
 
@@ -74,120 +73,131 @@
   <h2>分析結果</h2>
   <div id="list"></div>
 
-  <script>
-    let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
+<script>
+let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-    const settings = [
-      { s: 1, rb: 496, all: 168 },
-      { s: 2, rb: 467, all: 163 },
-      { s: 3, rb: 439, all: 156 },
-      { s: 4, rb: 405, all: 149 },
-      { s: 5, rb: 374, all: 141 },
-      { s: 6, rb: 343, all: 134 }
-    ];
+const settings = [
+  { s: 1, rb: 496, all: 168 },
+  { s: 2, rb: 467, all: 163 },
+  { s: 3, rb: 439, all: 156 },
+  { s: 4, rb: 405, all: 149 },
+  { s: 5, rb: 374, all: 141 },
+  { s: 6, rb: 343, all: 134 }
+];
 
-    function saveData() {
-      const machine = document.getElementById("machine").value;
-      const games = Number(document.getElementById("games").value);
-      const bb = Number(document.getElementById("bb").value);
-      const rb = Number(document.getElementById("rb").value);
+function saveData() {
+  const machine = document.getElementById("machine").value;
+  const games = Number(document.getElementById("games").value);
+  const bb = Number(document.getElementById("bb").value);
+  const rb = Number(document.getElementById("rb").value);
 
-      if (!machine || !games || !bb || !rb) {
-        alert("全部入力してね");
-        return;
-      }
+  if (!machine || !games || !bb && bb !== 0 || !rb) {
+    alert("全部入力してね");
+    return;
+  }
 
-      data.push({ machine, games, bb, rb });
-      localStorage.setItem("hanahanaData", JSON.stringify(data));
-      render();
+  data.push({ machine, games, bb, rb });
+  localStorage.setItem("hanahanaData", JSON.stringify(data));
+  render();
+}
+
+function clearData() {
+  if (!confirm("履歴を全て削除しますか？")) return;
+  data = [];
+  localStorage.removeItem("hanahanaData");
+  render();
+}
+
+/* ===== BB最低条件フィルター ===== */
+function invalidData(games, bb, mode) {
+  if (mode === "close" && bb === 0) return true;
+  if (games >= 5000 && bb < 8) return true;
+  if (games >= 4000 && bb < 5) return true;
+  if (games >= 3000 && bb < 3) return true;
+  return false;
+}
+
+function estimateSetting(games, bb, rb, mode) {
+  if (rb === 0) return 0;
+  if (invalidData(games, bb, mode)) return 0;
+
+  const rbRate = games / rb;
+  const allRate = games / (bb + rb);
+
+  let best = 0;
+  let bestScore = Infinity;
+
+  settings.forEach(st => {
+    const rbDiff = Math.abs(rbRate - st.rb);
+    const allDiff = Math.abs(allRate - st.all);
+    const score = rbDiff * 2 + allDiff;
+
+    if (score < bestScore) {
+      bestScore = score;
+      best = st.s;
     }
+  });
+  return best;
+}
 
-    function clearData() {
-      if (!confirm("履歴を全て削除しますか？")) return;
-      data = [];
-      localStorage.removeItem("hanahanaData");
-      render();
-    }
+function confidenceOpen(games, rb) {
+  if (games >= 3000 && rb >= 15) return "★★★★★";
+  if (games >= 2500 && rb >= 12) return "★★★★☆";
+  if (games >= 2000 && rb >= 9) return "★★★☆☆";
+  if (games >= 1000 && rb >= 5) return "★★☆☆☆";
+  return "★☆☆☆☆";
+}
 
-    function estimateSetting(games, bb, rb) {
-      if (rb === 0) return 0;
+function confidenceClose(games, rb) {
+  if (games >= 5000 && rb >= 25) return "★★★★★";
+  if (games >= 4500 && rb >= 22) return "★★★★☆";
+  if (games >= 4000 && rb >= 18) return "★★★☆☆";
+  if (games >= 3000 && rb >= 14) return "★★☆☆☆";
+  return "★☆☆☆☆";
+}
 
-      const rbRate = games / rb;
-      const allRate = games / (bb + rb);
+function starCount(stars) {
+  return stars.replace(/☆/g, "").length;
+}
 
-      let best = 0;
-      let bestScore = Infinity;
+function render() {
+  const list = document.getElementById("list");
+  const mode = document.getElementById("mode").value;
+  list.innerHTML = "";
 
-      settings.forEach(st => {
-        const rbDiff = Math.abs(rbRate - st.rb);
-        const allDiff = Math.abs(allRate - st.all);
-        const score = rbDiff * 2 + allDiff;
+  data.forEach(d => {
+    const total = d.bb + d.rb;
+    const gassan = total ? Math.floor(d.games / total) : "-";
+    const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
 
-        if (score < bestScore) {
-          bestScore = score;
-          best = st.s;
-        }
-      });
+    const setting = estimateSetting(d.games, d.bb, d.rb, mode);
+    const confidence =
+      mode === "open"
+        ? confidenceOpen(d.games, d.rb)
+        : confidenceClose(d.games, d.rb);
 
-      return best;
-    }
+    const aim =
+      setting >= 4 &&
+      starCount(confidence) >= 4 &&
+      setting !== 0;
 
-    function confidenceOpen(games, rb) {
-      if (games >= 3000 && rb >= 15) return "★★★★★";
-      if (games >= 2500 && rb >= 12) return "★★★★☆";
-      if (games >= 2000 && rb >= 9) return "★★★☆☆";
-      if (games >= 1000 && rb >= 5) return "★★☆☆☆";
-      return "★☆☆☆☆";
-    }
+    const card = document.createElement("div");
+    card.className = "card" + (aim ? " aim" : "");
 
-    function confidenceClose(games, rb) {
-      if (games >= 5000 && rb >= 25) return "★★★★★";
-      if (games >= 4500 && rb >= 22) return "★★★★☆";
-      if (games >= 4000 && rb >= 18) return "★★★☆☆";
-      if (games >= 3000 && rb >= 14) return "★★☆☆☆";
-      return "★☆☆☆☆";
-    }
+    card.innerHTML = `
+      <div>台番号：${d.machine}</div>
+      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+      <div>合算：1/${gassan}</div>
+      <div>RB：1/${rbRate}</div>
+      <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
+      <div class="${setting === 0 ? "gray" : ""}">信頼度：${confidence}</div>
+      ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
+    `;
+    list.appendChild(card);
+  });
+}
 
-    function starCount(stars) {
-      return stars.replace(/☆/g, "").length;
-    }
-
-    function render() {
-      const list = document.getElementById("list");
-      const mode = document.getElementById("mode").value;
-      list.innerHTML = "";
-
-      data.forEach(d => {
-        const totalBonus = d.bb + d.rb;
-        const gassan = totalBonus > 0 ? Math.floor(d.games / totalBonus) : "-";
-        const rbRate = d.rb > 0 ? Math.floor(d.games / d.rb) : "-";
-        const setting = estimateSetting(d.games, d.bb, d.rb);
-
-        const confidence =
-          mode === "open"
-            ? confidenceOpen(d.games, d.rb)
-            : confidenceClose(d.games, d.rb);
-
-        const aim =
-          setting >= 4 && starCount(confidence) >= 4;
-
-        const card = document.createElement("div");
-        card.className = "card" + (aim ? " aim" : "");
-
-        card.innerHTML = `
-          <div>台番号：${d.machine}</div>
-          <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-          <div>合算：1/${gassan}</div>
-          <div>RB：1/${rbRate}</div>
-          <div class="red">推定設定：${setting}</div>
-          <div>信頼度：${confidence}</div>
-          ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
-        `;
-        list.appendChild(card);
-      });
-    }
-
-    render();
-  </script>
+render();
+</script>
 </body>
 </html>
