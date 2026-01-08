@@ -1,77 +1,79 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title>ハナハナ設定判別</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta charset="UTF-8" />
+<title>ハナハナ設定判別</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
-    }
-    h1 { text-align: center; }
+<style>
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f5f5f5;
+  padding: 20px;
+}
+h1 { text-align: center; }
 
-    select, input, button {
-      width: 100%;
-      padding: 14px;
-      margin-top: 10px;
-      font-size: 16px;
-      border-radius: 8px;
-      border: 1px solid #ccc;
-    }
+select, input, button {
+  width: 100%;
+  padding: 14px;
+  margin-top: 10px;
+  font-size: 16px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
 
-    button.save {
-      background: #ff5a5a;
-      color: white;
-      border: none;
-    }
-    button.clear {
-      background: #888;
-      color: white;
-      border: none;
-    }
+button.save {
+  background: #ff5a5a;
+  color: white;
+  border: none;
+}
+button.clear {
+  background: #888;
+  color: white;
+  border: none;
+}
 
-    .card {
-      background: white;
-      padding: 15px;
-      border-radius: 10px;
-      margin-top: 15px;
-      border: 2px solid transparent;
-    }
-    .aim {
-      border-color: red;
-      background: #fff0f0;
-    }
-    .aim-label {
-      color: red;
-      font-weight: bold;
-      margin-top: 6px;
-    }
-    .red { color: red; font-weight: bold; }
-    .gray { color: #777; }
-  </style>
+.card {
+  background: white;
+  padding: 15px;
+  border-radius: 10px;
+  margin-top: 15px;
+  border: 2px solid transparent;
+}
+.aim {
+  border-color: red;
+  background: #fff0f0;
+}
+.aim-label {
+  color: red;
+  font-weight: bold;
+  margin-top: 6px;
+}
+.red { color: red; font-weight: bold; }
+.gray { color: #777; }
+.small { font-size: 13px; color: #666; }
+</style>
 </head>
 
 <body>
-  <h1>ハナハナ設定判別</h1>
+<h1>ハナハナ設定判別</h1>
 
-  <select id="mode" onchange="render()">
-    <option value="open">営業中モード</option>
-    <option value="close">閉店後モード</option>
-  </select>
+<select id="mode" onchange="render()">
+  <option value="open">営業中モード</option>
+  <option value="close">閉店後モード</option>
+</select>
 
-  <input id="machine" placeholder="台番号" type="number" />
-  <input id="games" placeholder="総回転数" type="number" />
-  <input id="bb" placeholder="BB回数" type="number" />
-  <input id="rb" placeholder="RB回数" type="number" />
+<input id="date" type="date" />
+<input id="machine" placeholder="台番号" type="number" />
+<input id="games" placeholder="総回転数" type="number" />
+<input id="bb" placeholder="BB回数" type="number" />
+<input id="rb" placeholder="RB回数" type="number" />
 
-  <button class="save" onclick="saveData()">保存</button>
-  <button class="clear" onclick="clearData()">履歴を全削除</button>
+<button class="save" onclick="saveData()">保存</button>
+<button class="clear" onclick="clearData()">履歴を全削除</button>
 
-  <h2>分析結果</h2>
-  <div id="list"></div>
+<h2>分析結果</h2>
+<div id="list"></div>
 
 <script>
 let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
@@ -85,30 +87,33 @@ const settings = [
   { s: 6, rb: 343, all: 134 }
 ];
 
+document.getElementById("date").value =
+  new Date().toISOString().split("T")[0];
+
 function saveData() {
-  const machine = document.getElementById("machine").value;
+  const date = document.getElementById("date").value;
+  const machine = Number(document.getElementById("machine").value);
   const games = Number(document.getElementById("games").value);
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!machine || !games || !bb && bb !== 0 || !rb) {
+  if (!date || !machine || !games || rb === undefined || bb === undefined) {
     alert("全部入力してね");
     return;
   }
 
-  data.push({ machine, games, bb, rb });
+  data.push({ date, machine, games, bb, rb });
   localStorage.setItem("hanahanaData", JSON.stringify(data));
   render();
 }
 
 function clearData() {
-  if (!confirm("履歴を全て削除しますか？")) return;
+  if (!confirm("履歴を全削除しますか？")) return;
   data = [];
   localStorage.removeItem("hanahanaData");
   render();
 }
 
-/* ===== BB最低条件フィルター ===== */
 function invalidData(games, bb, mode) {
   if (mode === "close" && bb === 0) return true;
   if (games >= 5000 && bb < 8) return true;
@@ -128,10 +133,9 @@ function estimateSetting(games, bb, rb, mode) {
   let bestScore = Infinity;
 
   settings.forEach(st => {
-    const rbDiff = Math.abs(rbRate - st.rb);
-    const allDiff = Math.abs(allRate - st.all);
-    const score = rbDiff * 2 + allDiff;
-
+    const score =
+      Math.abs(rbRate - st.rb) * 2 +
+      Math.abs(allRate - st.all);
     if (score < bestScore) {
       bestScore = score;
       best = st.s;
@@ -140,24 +144,23 @@ function estimateSetting(games, bb, rb, mode) {
   return best;
 }
 
-function confidenceOpen(games, rb) {
-  if (games >= 3000 && rb >= 15) return "★★★★★";
-  if (games >= 2500 && rb >= 12) return "★★★★☆";
-  if (games >= 2000 && rb >= 9) return "★★★☆☆";
-  if (games >= 1000 && rb >= 5) return "★★☆☆☆";
+function confidence(games, rb, mode) {
+  if (mode === "close") {
+    if (games >= 5000 && rb >= 25) return "★★★★★";
+    if (games >= 4500 && rb >= 22) return "★★★★☆";
+    if (games >= 4000 && rb >= 18) return "★★★☆☆";
+    if (games >= 3000 && rb >= 14) return "★★☆☆☆";
+  } else {
+    if (games >= 3000 && rb >= 15) return "★★★★★";
+    if (games >= 2500 && rb >= 12) return "★★★★☆";
+    if (games >= 2000 && rb >= 9) return "★★★☆☆";
+    if (games >= 1000 && rb >= 5) return "★★☆☆☆";
+  }
   return "★☆☆☆☆";
 }
 
-function confidenceClose(games, rb) {
-  if (games >= 5000 && rb >= 25) return "★★★★★";
-  if (games >= 4500 && rb >= 22) return "★★★★☆";
-  if (games >= 4000 && rb >= 18) return "★★★☆☆";
-  if (games >= 3000 && rb >= 14) return "★★☆☆☆";
-  return "★☆☆☆☆";
-}
-
-function starCount(stars) {
-  return stars.replace(/☆/g, "").length;
+function starCount(s) {
+  return s.replace(/☆/g, "").length;
 }
 
 function render() {
@@ -165,36 +168,31 @@ function render() {
   const mode = document.getElementById("mode").value;
   list.innerHTML = "";
 
-  data.forEach(d => {
-    const total = d.bb + d.rb;
-    const gassan = total ? Math.floor(d.games / total) : "-";
-    const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
+  data
+    .sort((a, b) =>
+      a.machine !== b.machine
+        ? a.machine - b.machine
+        : a.date.localeCompare(b.date)
+    )
+    .forEach(d => {
+      const total = d.bb + d.rb;
+      const setting = estimateSetting(d.games, d.bb, d.rb, mode);
+      const conf = confidence(d.games, d.rb, mode);
+      const aim = setting >= 4 && starCount(conf) >= 4;
 
-    const setting = estimateSetting(d.games, d.bb, d.rb, mode);
-    const confidence =
-      mode === "open"
-        ? confidenceOpen(d.games, d.rb)
-        : confidenceClose(d.games, d.rb);
+      const card = document.createElement("div");
+      card.className = "card" + (aim ? " aim" : "");
 
-    const aim =
-      setting >= 4 &&
-      starCount(confidence) >= 4 &&
-      setting !== 0;
-
-    const card = document.createElement("div");
-    card.className = "card" + (aim ? " aim" : "");
-
-    card.innerHTML = `
-      <div>台番号：${d.machine}</div>
-      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-      <div>合算：1/${gassan}</div>
-      <div>RB：1/${rbRate}</div>
-      <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
-      <div class="${setting === 0 ? "gray" : ""}">信頼度：${confidence}</div>
-      ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
-    `;
-    list.appendChild(card);
-  });
+      card.innerHTML = `
+        <div class="small">${d.date}</div>
+        <div>台番号：${d.machine}</div>
+        <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+        <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
+        <div>信頼度：${conf}</div>
+        ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
+      `;
+      list.appendChild(card);
+    });
 }
 
 render();
