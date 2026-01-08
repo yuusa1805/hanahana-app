@@ -87,6 +87,7 @@ const settings = [
   { s: 6, rb: 343, all: 134 }
 ];
 
+// 今日の日付を自動セット
 document.getElementById("date").value =
   new Date().toISOString().split("T")[0];
 
@@ -97,7 +98,7 @@ function saveData() {
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!date || !machine || !games || rb === undefined || bb === undefined) {
+  if (!date || !machine || !games || bb < 0 || rb < 0) {
     alert("全部入力してね");
     return;
   }
@@ -114,6 +115,7 @@ function clearData() {
   render();
 }
 
+/* ===== BB最低条件フィルター ===== */
 function invalidData(games, bb, mode) {
   if (mode === "close" && bb === 0) return true;
   if (games >= 5000 && bb < 8) return true;
@@ -141,6 +143,7 @@ function estimateSetting(games, bb, rb, mode) {
       best = st.s;
     }
   });
+
   return best;
 }
 
@@ -159,8 +162,8 @@ function confidence(games, rb, mode) {
   return "★☆☆☆☆";
 }
 
-function starCount(s) {
-  return s.replace(/☆/g, "").length;
+function starCount(stars) {
+  return stars.replace(/☆/g, "").length;
 }
 
 function render() {
@@ -176,9 +179,15 @@ function render() {
     )
     .forEach(d => {
       const total = d.bb + d.rb;
+      const gassan = total ? Math.floor(d.games / total) : "-";
+      const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
+
       const setting = estimateSetting(d.games, d.bb, d.rb, mode);
       const conf = confidence(d.games, d.rb, mode);
-      const aim = setting >= 4 && starCount(conf) >= 4;
+      const aim =
+        setting >= 4 &&
+        starCount(conf) >= 4 &&
+        setting !== 0;
 
       const card = document.createElement("div");
       card.className = "card" + (aim ? " aim" : "");
@@ -187,8 +196,10 @@ function render() {
         <div class="small">${d.date}</div>
         <div>台番号：${d.machine}</div>
         <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+        <div>合算：1/${gassan}</div>
+        <div>RB：1/${rbRate}</div>
         <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
-        <div>信頼度：${conf}</div>
+        <div class="${setting === 0 ? "gray" : ""}">信頼度：${conf}</div>
         ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
       `;
       list.appendChild(card);
