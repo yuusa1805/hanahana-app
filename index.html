@@ -2,123 +2,171 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ハナハナ設定判別</title>
+<title>ハナハナ 閉店後分析</title>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
 body {
-  font-family: sans-serif;
-  background: #f5f5f5;
-  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f2f2f2;
+  margin: 0;
+  padding: 16px;
 }
-input, select, button {
-  margin: 4px 0;
-  padding: 6px;
+
+h2 {
+  text-align: center;
 }
+
+.section {
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+label {
+  font-weight: bold;
+  display: block;
+  margin-top: 12px;
+}
+
+input {
+  width: 100%;
+  font-size: 20px;
+  padding: 14px;
+  margin-top: 4px;
+  box-sizing: border-box;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+}
+
+.row input {
+  flex: 1;
+}
+
+button {
+  width: 100%;
+  font-size: 20px;
+  padding: 14px;
+  margin-top: 16px;
+  border: none;
+  border-radius: 10px;
+  background: #ff6b6b;
+  color: white;
+}
+
 .item {
   background: white;
-  padding: 10px;
-  margin-top: 10px;
-  border-radius: 6px;
+  padding: 14px;
+  border-radius: 10px;
+  margin-top: 12px;
 }
-.good { color: red; font-weight: bold; }
+
+.good {
+  color: red;
+  font-weight: bold;
+  margin-top: 6px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>🌺 ハナハナ設定判別</h2>
+<h2>🌺 ハナハナ 閉店後分析</h2>
 
-<label>モード：</label>
-<select id="mode">
-  <option value="open">営業中</option>
-  <option value="close">閉店後</option>
-</select><br>
+<div class="section">
+  <label>日付</label>
+  <input type="date" id="date">
 
-<input id="machine" placeholder="台番号"><br>
-<input id="games" type="number" placeholder="総回転数"><br>
-<input id="bb" type="number" placeholder="BB"><br>
-<input id="rb" type="number" placeholder="RB"><br>
+  <label>台番号</label>
+  <input id="machine" placeholder="例：303">
 
-<button onclick="saveData()">保存</button>
-<button onclick="clearData()">全削除</button>
+  <label>総回転数</label>
+  <input id="games" type="number" placeholder="例：5200">
+
+  <div class="row">
+    <div>
+      <label>BB</label>
+      <input id="bb" type="number" placeholder="例：24">
+    </div>
+    <div>
+      <label>RB</label>
+      <input id="rb" type="number" placeholder="例：28">
+    </div>
+  </div>
+
+  <button onclick="saveData()">保存</button>
+</div>
+
+<div class="section">
+  <button onclick="clearData()">全データ削除</button>
+</div>
 
 <div id="list"></div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
+let data = JSON.parse(localStorage.getItem("hana_close_data")) || [];
 
 function saveData() {
   const d = {
+    date: date.value,
     machine: machine.value,
     games: Number(games.value),
     bb: Number(bb.value),
-    rb: Number(rb.value),
-    mode: mode.value
+    rb: Number(rb.value)
   };
 
-  if (!d.machine || !d.games) {
+  if (!d.date || !d.machine || !d.games) {
     alert("未入力があります");
     return;
   }
 
   data.push(d);
-  localStorage.setItem("hanahanaData", JSON.stringify(data));
+  localStorage.setItem("hana_close_data", JSON.stringify(data));
   render();
 }
 
 function clearData() {
-  if (confirm("全削除する？")) {
-    localStorage.removeItem("hanahanaData");
+  if (confirm("本当に全削除する？")) {
     data = [];
+    localStorage.removeItem("hana_close_data");
     render();
   }
 }
 
 function judge(d) {
   const total = d.bb + d.rb;
-  const g = d.games;
   if (total === 0) return { set: "判別不可", star: 1 };
 
-  const rbRate = g / d.rb || Infinity;
-  const allRate = g / total;
+  const rbRate = d.games / d.rb || Infinity;
+  const allRate = d.games / total;
 
-  let set = 1;
-  let star = 1;
-
-  // 🔒 閉店後は超厳しめ
-  if (d.mode === "close") {
-    if (g >= 5000 && d.rb >= 20 && rbRate <= 200 && allRate <= 130) {
-      set = 6; star = 5;
-    } else if (g >= 4000 && d.rb >= 16 && rbRate <= 230) {
-      set = 5; star = 4;
-    } else if (g >= 3000 && d.rb >= 12 && rbRate <= 260) {
-      set = 4; star = 3;
-    } else {
-      return { set: "判別不可", star: 1 };
-    }
+  // 🚫 BB0は閉店後NG
+  if (d.bb === 0) {
+    return { set: "判別不可", star: 1 };
   }
 
-  // ⚡ 営業中は可能性重視
-  if (d.mode === "open") {
-    if (g >= 2000 && d.rb >= 10 && rbRate <= 240) {
-      set = 6; star = 4;
-    } else if (g >= 1500 && d.rb >= 7 && rbRate <= 280) {
-      set = 5; star = 3;
-    } else if (g >= 1200 && d.rb >= 5 && rbRate <= 320) {
-      set = 4; star = 2;
-    }
+  // 🔒 超厳しめロジック
+  if (d.games >= 5000 && d.rb >= 20 && rbRate <= 200 && allRate <= 130) {
+    return { set: 6, star: 5 };
+  }
+  if (d.games >= 4000 && d.rb >= 16 && rbRate <= 230) {
+    return { set: 5, star: 4 };
+  }
+  if (d.games >= 3000 && d.rb >= 12 && rbRate <= 260) {
+    return { set: 4, star: 3 };
   }
 
-  // 🚫 BB0対策（営業中のみ緩和）
-  if (d.bb === 0 && d.mode === "close") {
-    set = "判別不可";
-    star = 1;
-  }
-
-  return { set, star };
+  return { set: "判別不可", star: 1 };
 }
 
 function render() {
   list.innerHTML = "";
+
   data.forEach(d => {
     const total = d.bb + d.rb;
     const allRate = total ? `1/${Math.floor(d.games / total)}` : "-";
@@ -127,21 +175,19 @@ function render() {
     const j = judge(d);
 
     let extra = "";
-    if (d.mode === "open" && j.set >= 4 && j.star >= 4) {
-      extra = `<div class="good">🔥 狙い目</div>`;
-    }
-    if (d.mode === "close" && j.set >= 4) {
+    if (j.set >= 4) {
       const level = j.set === 6 ? "強" : j.set === 5 ? "中" : "弱";
       extra = `<div class="good">📊 高設定（${level}）</div>`;
     }
 
     list.innerHTML += `
       <div class="item">
-        <b>台番号：</b>${d.machine}<br>
+        <b>${d.date}</b><br>
+        台番号：${d.machine}<br>
         ${d.games}G / BB:${d.bb} RB:${d.rb}<br>
         合算：${allRate}　RB：${rbRate}<br>
         推定設定：${j.set}<br>
-        信頼度：${"★".repeat(j.star)}${"☆".repeat(5-j.star)}
+        信頼度：${"★".repeat(j.star)}${"☆".repeat(5 - j.star)}
         ${extra}
       </div>
     `;
