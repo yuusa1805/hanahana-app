@@ -1,194 +1,141 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8" />
-<title>ハナハナ設定判別</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-<style>
-body {
-  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f5f5f5;
-  padding: 20px;
-}
-h1 { text-align: center; }
-
-select, input, button {
-  width: 100%;
-  padding: 14px;
-  margin-top: 10px;
-  font-size: 16px;
-  border-radius: 8px;
-  border: 1px solid #ccc;
-}
-
-button.save {
-  background: #ff5a5a;
-  color: white;
-  border: none;
-}
-button.clear {
-  background: #888;
-  color: white;
-  border: none;
-}
-
-.card {
-  background: white;
-  padding: 15px;
-  border-radius: 10px;
-  margin-top: 15px;
-  border: 2px solid transparent;
-}
-.aim {
-  border-color: red;
-  background: #fff0f0;
-}
-.keep {
-  border-color: orange;
-  background: #fff7e6;
-}
-.up {
-  border-color: green;
-  background: #eaffea;
-}
-
-.label {
-  font-weight: bold;
-  margin-top: 6px;
-}
-.red { color: red; font-weight: bold; }
-.orange { color: orange; }
-.green { color: green; }
-.gray { color: #777; }
-.small { font-size: 13px; color: #666; }
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ハナハナ設定判別</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f5f5f5;
+      padding: 10px;
+    }
+    h1, h2 {
+      margin: 10px 0;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      font-size: 16px;
+    }
+    button {
+      background: #333;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    .card {
+      background: white;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .small {
+      font-size: 12px;
+      color: #666;
+    }
+    .red {
+      color: #d00;
+      font-weight: bold;
+    }
+    .aim-label {
+      background: gold;
+      padding: 4px;
+      text-align: center;
+      margin-top: 5px;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .delete {
+      background: #c00;
+      margin-top: 5px;
+    }
+  </style>
 </head>
-
 <body>
-<h1>ハナハナ設定判別</h1>
 
-<select id="mode" onchange="render()">
+<h1>🌺 ハナハナ設定判別</h1>
+
+<select id="mode">
   <option value="open">営業中モード</option>
   <option value="close">閉店後モード</option>
 </select>
 
 <input id="date" type="date" />
-<input id="machine" placeholder="台番号" type="number" />
+<input id="machine" placeholder="台番号" />
 <input id="games" placeholder="総回転数" type="number" />
 <input id="bb" placeholder="BB回数" type="number" />
 <input id="rb" placeholder="RB回数" type="number" />
 
-<button class="save" onclick="saveData()">保存</button>
-<button class="clear" onclick="clearData()">履歴を全削除</button>
+<button onclick="saveData()">保存</button>
 
-<h2>分析結果</h2>
+<h2>📋 台データ</h2>
 <div id="list"></div>
+
+<h2>🏪 ホール傾向分析</h2>
+<div id="hall"></div>
 
 <script>
 let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-const settings = [
-  { s: 1, rb: 496, all: 168 },
-  { s: 2, rb: 467, all: 163 },
-  { s: 3, rb: 439, all: 156 },
-  { s: 4, rb: 405, all: 149 },
-  { s: 5, rb: 374, all: 141 },
-  { s: 6, rb: 343, all: 134 }
-];
-
-document.getElementById("date").value =
-  new Date().toISOString().split("T")[0];
-
 function saveData() {
-  const date = document.getElementById("date").value;
-  const machine = Number(document.getElementById("machine").value);
-  const games = Number(document.getElementById("games").value);
-  const bb = Number(document.getElementById("bb").value);
-  const rb = Number(document.getElementById("rb").value);
-
-  if (!date || !machine || !games) {
-    alert("全部入力してね");
+  const d = {
+    date: document.getElementById("date").value,
+    machine: Number(document.getElementById("machine").value),
+    games: Number(document.getElementById("games").value),
+    bb: Number(document.getElementById("bb").value),
+    rb: Number(document.getElementById("rb").value)
+  };
+  if (!d.date || !d.machine || !d.games) {
+    alert("未入力があります");
     return;
   }
-
-  data.push({ date, machine, games, bb, rb });
+  data.push(d);
   localStorage.setItem("hanahanaData", JSON.stringify(data));
   render();
 }
 
-function clearData() {
-  if (!confirm("履歴を全削除しますか？")) return;
-  data = [];
-  localStorage.removeItem("hanahanaData");
-  render();
-}
+function estimateSetting(g, bb, rb, mode) {
+  if (g < (mode === "close" ? 3000 : 800)) return 0;
 
-function invalidData(games, bb, mode) {
-  if (mode === "close" && bb === 0) return true;
-  if (games >= 5000 && bb < 8) return true;
-  if (games >= 4000 && bb < 5) return true;
-  if (games >= 3000 && bb < 3) return true;
-  return false;
-}
+  const rbRate = g / rb;
 
-function estimateSetting(games, bb, rb, mode) {
-  if (rb === 0) return 0;
-  if (invalidData(games, bb, mode)) return 0;
-
-  const rbRate = games / rb;
-  const allRate = games / (bb + rb);
-
-  let best = 0;
-  let bestScore = Infinity;
-
-  settings.forEach(st => {
-    const score =
-      Math.abs(rbRate - st.rb) * 2 +
-      Math.abs(allRate - st.all);
-    if (score < bestScore) {
-      bestScore = score;
-      best = st.s;
-    }
-  });
-  return best;
-}
-
-function confidence(games, rb, mode) {
-  if (mode === "close") {
-    if (games >= 5000 && rb >= 25) return 5;
-    if (games >= 4500 && rb >= 22) return 4;
-    if (games >= 4000 && rb >= 18) return 3;
-    if (games >= 3000 && rb >= 14) return 2;
-  } else {
-    if (games >= 3000 && rb >= 15) return 5;
-    if (games >= 2500 && rb >= 12) return 4;
-    if (games >= 2000 && rb >= 9) return 3;
-    if (games >= 1000 && rb >= 5) return 2;
-  }
+  if (rbRate < 220) return 6;
+  if (rbRate < 250) return 5;
+  if (rbRate < 280) return 4;
+  if (rbRate < 330) return 3;
+  if (rbRate < 400) return 2;
   return 1;
 }
 
-function judgeTrend(today, yesterday) {
-  if (!yesterday) return null;
-  if (today.setting === 0 || yesterday.setting === 0) return "判別不可";
-
-  if (yesterday.setting >= 4 && today.setting >= 4)
-    return "据え置き濃厚";
-
-  if (yesterday.setting <= 2 && today.setting >= 4)
-    return "上げ濃厚";
-
-  if (yesterday.setting >= 4 && today.setting <= 2)
-    return "下げ濃厚";
-
-  return "不明";
+function confidence(g, rb, mode) {
+  if (mode === "close") {
+    if (g >= 7000) return "★★★★★";
+    if (g >= 5000) return "★★★★☆";
+    if (g >= 3500) return "★★★☆☆";
+    return "★★☆☆☆";
+  } else {
+    if (g >= 3000) return "★★★☆☆";
+    if (g >= 1500) return "★★☆☆☆";
+    return "★☆☆☆☆";
+  }
 }
 
-function render() {
-  const list = document.getElementById("list");
-  const mode = document.getElementById("mode").value;
-  list.innerHTML = "";
+function starCount(s) {
+  return (s.match(/★/g) || []).length;
+}
+
+function deleteData(index) {
+  if (!confirm("削除する？")) return;
+  data.splice(index, 1);
+  localStorage.setItem("hanahanaData", JSON.stringify(data));
+  render();
+}
+
+function analyzeHallTrend() {
+  let keep = 0, up = 0, down = 0, unknown = 0;
 
   const sorted = [...data].sort((a, b) =>
     a.machine !== b.machine
@@ -196,65 +143,81 @@ function render() {
       : a.date.localeCompare(b.date)
   );
 
-  sorted.forEach((d, i) => {
+  for (let i = 1; i < sorted.length; i++) {
+    const t = sorted[i];
+    const y = sorted[i - 1];
+    if (t.machine !== y.machine) continue;
+
+    const tSet = estimateSetting(t.games, t.bb, t.rb, "close");
+    const ySet = estimateSetting(y.games, y.bb, y.rb, "close");
+
+    if (!tSet || !ySet) {
+      unknown++;
+    } else if (ySet >= 4 && tSet >= 4) {
+      keep++;
+    } else if (ySet <= 2 && tSet >= 4) {
+      up++;
+    } else if (ySet >= 4 && tSet <= 2) {
+      down++;
+    } else {
+      unknown++;
+    }
+  }
+
+  const total = keep + up + down + unknown || 1;
+
+  let type = "傾向不明";
+  if (keep / total >= 0.5) type = "🟧 据え置き重視店";
+  else if (up / total >= 0.3) type = "🟩 上げ狙い有効店";
+  else if (down / total >= 0.3) type = "🟥 下げ多め注意店";
+
+  return { keep, up, down, unknown, total, type };
+}
+
+function render() {
+  const mode = document.getElementById("mode").value;
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach((d, i) => {
     const total = d.bb + d.rb;
     const gassan = total ? Math.floor(d.games / total) : "-";
     const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
 
-    const setting = estimateSetting(d.games, d.bb, d.rb, mode);
+    const set = estimateSetting(d.games, d.bb, d.rb, mode);
     const conf = confidence(d.games, d.rb, mode);
-
-    const yesterday =
-      sorted[i - 1] &&
-      sorted[i - 1].machine === d.machine
-        ? sorted[i - 1]
-        : null;
-
-    const trend = judgeTrend(
-      { setting },
-      yesterday
-        ? {
-            setting: estimateSetting(
-              yesterday.games,
-              yesterday.bb,
-              yesterday.rb,
-              mode
-            )
-          }
-        : null
-    );
-
-    let cls = "card";
-    if (trend === "据え置き濃厚") cls += " keep";
-    if (trend === "上げ濃厚") cls += " up";
+    const aim = set >= 4 && starCount(conf) >= 4;
 
     const card = document.createElement("div");
-    card.className = cls;
-
+    card.className = "card";
     card.innerHTML = `
       <div class="small">${d.date}</div>
       <div>台番号：${d.machine}</div>
       <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-      <div>合算：1/${gassan}　RB：1/${rbRate}</div>
-      <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
-      <div>信頼度：${"★".repeat(conf)}${"☆".repeat(5 - conf)}</div>
-      ${
-        trend
-          ? `<div class="label ${
-              trend === "据え置き濃厚"
-                ? "orange"
-                : trend === "上げ濃厚"
-                ? "green"
-                : "gray"
-            }">🔮 ${trend}</div>`
-          : ""
-      }
+      <div>合算：1/${gassan}</div>
+      <div>RB：1/${rbRate}</div>
+      <div class="red">推定設定：${set || "判別不可"}</div>
+      <div>信頼度：${conf}</div>
+      ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
+      <button class="delete" onclick="deleteData(${i})">削除</button>
     `;
     list.appendChild(card);
   });
+
+  const hall = analyzeHallTrend();
+  document.getElementById("hall").innerHTML = `
+    <div class="card">
+      <div>据え：${hall.keep}</div>
+      <div>上げ：${hall.up}</div>
+      <div>下げ：${hall.down}</div>
+      <div>不可：${hall.unknown}</div>
+      <div class="red">${hall.type}</div>
+    </div>
+  `;
 }
 
 render();
 </script>
+
 </body>
 </html>
