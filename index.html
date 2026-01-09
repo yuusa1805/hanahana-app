@@ -1,189 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ハナハナ設定判別</title>
-  <style>
-    body { font-family: sans-serif; background:#f5f5f5; padding:10px; }
-    h1,h2 { margin:10px 0; }
-    input,select,button { width:100%; padding:8px; margin:5px 0; font-size:16px; }
-    button { background:#333; color:#fff; border:none; border-radius:4px; }
-    .card {
-      background:#fff; padding:10px; margin:10px 0;
-      border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,.1);
-    }
-    .small { font-size:12px; color:#666; }
-    .red { color:#d00; font-weight:bold; }
-    .aim-label {
-      background:gold; padding:4px; text-align:center;
-      margin-top:6px; border-radius:4px; font-weight:bold;
-    }
-    .delete { background:#c00; margin-top:6px; }
-  </style>
+<meta charset="UTF-8">
+<title>ハナハナ設定判別</title>
+<style>
+body {
+  font-family: sans-serif;
+  background: #f5f5f5;
+  padding: 20px;
+}
+input, select, button {
+  margin: 4px 0;
+  padding: 6px;
+}
+.item {
+  background: white;
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+.good { color: red; font-weight: bold; }
+</style>
 </head>
+
 <body>
 
-<h1>🌺 ハナハナ設定判別</h1>
+<h2>🌺 ハナハナ設定判別</h2>
 
-<!-- ★ モード切替：変更時に即再描画 -->
-<select id="mode" onchange="render()">
-  <option value="open">営業中モード</option>
-  <option value="close">閉店後モード</option>
-</select>
+<label>モード：</label>
+<select id="mode">
+  <option value="open">営業中</option>
+  <option value="close">閉店後</option>
+</select><br>
 
-<input id="date" type="date">
-<input id="machine" type="number" placeholder="台番号">
-<input id="games" type="number" placeholder="総回転数">
-<input id="bb" type="number" placeholder="BB回数">
-<input id="rb" type="number" placeholder="RB回数">
+<input id="machine" placeholder="台番号"><br>
+<input id="games" type="number" placeholder="総回転数"><br>
+<input id="bb" type="number" placeholder="BB"><br>
+<input id="rb" type="number" placeholder="RB"><br>
 
 <button onclick="saveData()">保存</button>
+<button onclick="clearData()">全削除</button>
 
-<h2>📋 台データ</h2>
 <div id="list"></div>
-
-<h2>🏪 ホール傾向分析</h2>
-<div id="hall"></div>
 
 <script>
 let data = JSON.parse(localStorage.getItem("hanahanaData")) || [];
 
-/* ===== 保存 ===== */
 function saveData() {
   const d = {
-    date: document.getElementById("date").value,
-    machine: Number(document.getElementById("machine").value),
-    games: Number(document.getElementById("games").value),
-    bb: Number(document.getElementById("bb").value),
-    rb: Number(document.getElementById("rb").value)
+    machine: machine.value,
+    games: Number(games.value),
+    bb: Number(bb.value),
+    rb: Number(rb.value),
+    mode: mode.value
   };
-  if (!d.date || !d.machine || !d.games) {
+
+  if (!d.machine || !d.games) {
     alert("未入力があります");
     return;
   }
+
   data.push(d);
   localStorage.setItem("hanahanaData", JSON.stringify(data));
   render();
 }
 
-/* ===== 設定推定（営業中は厳しめ） ===== */
-function estimateSetting(g, bb, rb, mode) {
-  if (mode === "open" && g < 1500) return 0;
-  if (mode === "close" && g < 3000) return 0;
-
-  const rbRate = g / rb;
-
-  if (rbRate < 220) return mode === "open" && g < 3000 ? 4 : 6;
-  if (rbRate < 250) return mode === "open" ? 4 : 5;
-  if (rbRate < 280) return 4;
-  if (rbRate < 330) return 3;
-  if (rbRate < 400) return 2;
-  return 1;
-}
-
-/* ===== 信頼度 ===== */
-function confidence(g, rb, mode) {
-  if (mode === "close") {
-    if (g >= 7000) return "★★★★★";
-    if (g >= 5000) return "★★★★☆";
-    if (g >= 3500) return "★★★☆☆";
-    return "★★☆☆☆";
-  } else {
-    if (g >= 3000) return "★★★☆☆";
-    if (g >= 2000) return "★★☆☆☆";
-    return "★☆☆☆☆";
+function clearData() {
+  if (confirm("全削除する？")) {
+    localStorage.removeItem("hanahanaData");
+    data = [];
+    render();
   }
 }
 
-function starCount(s) {
-  return (s.match(/★/g) || []).length;
-}
+function judge(d) {
+  const total = d.bb + d.rb;
+  const g = d.games;
+  if (total === 0) return { set: "判別不可", star: 1 };
 
-/* ===== 削除 ===== */
-function deleteData(i) {
-  if (!confirm("削除する？")) return;
-  data.splice(i, 1);
-  localStorage.setItem("hanahanaData", JSON.stringify(data));
-  render();
-}
+  const rbRate = g / d.rb || Infinity;
+  const allRate = g / total;
 
-/* ===== ホール傾向 ===== */
-function analyzeHallTrend() {
-  let keep=0, up=0, down=0, unknown=0;
+  let set = 1;
+  let star = 1;
 
-  const sorted = [...data].sort((a,b)=>
-    a.machine !== b.machine ? a.machine-b.machine : a.date.localeCompare(b.date)
-  );
-
-  for (let i=1;i<sorted.length;i++) {
-    const t = sorted[i], y = sorted[i-1];
-    if (t.machine !== y.machine) continue;
-
-    const ts = estimateSetting(t.games,t.bb,t.rb,"close");
-    const ys = estimateSetting(y.games,y.bb,y.rb,"close");
-
-    if (!ts || !ys) unknown++;
-    else if (ys>=4 && ts>=4) keep++;
-    else if (ys<=2 && ts>=4) up++;
-    else if (ys>=4 && ts<=2) down++;
-    else unknown++;
+  // 🔒 閉店後は超厳しめ
+  if (d.mode === "close") {
+    if (g >= 5000 && d.rb >= 20 && rbRate <= 200 && allRate <= 130) {
+      set = 6; star = 5;
+    } else if (g >= 4000 && d.rb >= 16 && rbRate <= 230) {
+      set = 5; star = 4;
+    } else if (g >= 3000 && d.rb >= 12 && rbRate <= 260) {
+      set = 4; star = 3;
+    } else {
+      return { set: "判別不可", star: 1 };
+    }
   }
 
-  const total = keep+up+down+unknown || 1;
-  let type="傾向不明";
-  if (keep/total>=0.5) type="🟧 据え置き重視店";
-  else if (up/total>=0.3) type="🟩 上げ狙い有効店";
-  else if (down/total>=0.3) type="🟥 下げ多め注意店";
+  // ⚡ 営業中は可能性重視
+  if (d.mode === "open") {
+    if (g >= 2000 && d.rb >= 10 && rbRate <= 240) {
+      set = 6; star = 4;
+    } else if (g >= 1500 && d.rb >= 7 && rbRate <= 280) {
+      set = 5; star = 3;
+    } else if (g >= 1200 && d.rb >= 5 && rbRate <= 320) {
+      set = 4; star = 2;
+    }
+  }
 
-  return {keep,up,down,unknown,total,type};
+  // 🚫 BB0対策（営業中のみ緩和）
+  if (d.bb === 0 && d.mode === "close") {
+    set = "判別不可";
+    star = 1;
+  }
+
+  return { set, star };
 }
 
-/* ===== 描画 ===== */
 function render() {
-  const mode = document.getElementById("mode").value;
-  const list = document.getElementById("list");
   list.innerHTML = "";
-
-  data.forEach((d,i)=>{
+  data.forEach(d => {
     const total = d.bb + d.rb;
-    const gassan = total ? Math.floor(d.games / total) : "-";
-    const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
+    const allRate = total ? `1/${Math.floor(d.games / total)}` : "-";
+    const rbRate = d.rb ? `1/${Math.floor(d.games / d.rb)}` : "-";
 
-    const set = estimateSetting(d.games,d.bb,d.rb,mode);
-    const conf = confidence(d.games,d.rb,mode);
+    const j = judge(d);
 
-    // 🔥 狙い目は「閉店後基準」で固定
-    const aim =
-      estimateSetting(d.games,d.bb,d.rb,"close") >= 4 &&
-      starCount(confidence(d.games,d.rb,"close")) >= 4;
+    let extra = "";
+    if (d.mode === "open" && j.set >= 4 && j.star >= 4) {
+      extra = `<div class="good">🔥 狙い目</div>`;
+    }
+    if (d.mode === "close" && j.set >= 4) {
+      const level = j.set === 6 ? "強" : j.set === 5 ? "中" : "弱";
+      extra = `<div class="good">📊 高設定（${level}）</div>`;
+    }
 
-    const card = document.createElement("div");
-    card.className = "card";
-    card.innerHTML = `
-      <div class="small">${d.date}</div>
-      <div>台番号：${d.machine}</div>
-      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-      <div>合算：1/${gassan}</div>
-      <div>RB：1/${rbRate}</div>
-      <div class="red">推定設定：${set || "判別不可"}</div>
-      <div>信頼度：${conf}</div>
-      ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
-      <button class="delete" onclick="deleteData(${i})">削除</button>
+    list.innerHTML += `
+      <div class="item">
+        <b>台番号：</b>${d.machine}<br>
+        ${d.games}G / BB:${d.bb} RB:${d.rb}<br>
+        合算：${allRate}　RB：${rbRate}<br>
+        推定設定：${j.set}<br>
+        信頼度：${"★".repeat(j.star)}${"☆".repeat(5-j.star)}
+        ${extra}
+      </div>
     `;
-    list.appendChild(card);
   });
-
-  const hall = analyzeHallTrend();
-  document.getElementById("hall").innerHTML = `
-    <div class="card">
-      <div>据え：${hall.keep}</div>
-      <div>上げ：${hall.up}</div>
-      <div>下げ：${hall.down}</div>
-      <div>不可：${hall.unknown}</div>
-      <div class="red">${hall.type}</div>
-    </div>
-  `;
 }
 
 render();
