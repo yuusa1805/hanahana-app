@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <title>ハナハナ 閉店後分析</title>
-
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
@@ -140,28 +139,27 @@ function clearData() {
 
 function judge(d) {
   const total = d.bb + d.rb;
-  if (total === 0) return { set: "判別不可", star: 1 };
+  const rbRate = d.rb ? d.games / d.rb : Infinity;
+  const allRate = total ? d.games / total : Infinity;
 
-  const rbRate = d.games / d.rb || Infinity;
-  const allRate = d.games / total;
-
-  // 🚫 BB0は閉店後NG
-  if (d.bb === 0) {
-    return { set: "判別不可", star: 1 };
-  }
-
-  // 🔒 超厳しめロジック
+  // 🔒 高設定ゾーン（厳しめ）
   if (d.games >= 5000 && d.rb >= 20 && rbRate <= 200 && allRate <= 130) {
     return { set: 6, star: 5 };
   }
   if (d.games >= 4000 && d.rb >= 16 && rbRate <= 230) {
     return { set: 5, star: 4 };
   }
-  if (d.games >= 3000 && d.rb >= 12 && rbRate <= 260) {
+  if (d.games >= 3000 && d.rb >= 12 && rbRate <= 280) {
     return { set: 4, star: 3 };
   }
 
-  return { set: "判別不可", star: 1 };
+  // ⚠️ 低信頼ゾーン（旧・判別不可）
+  if (d.games < 2000 || d.bb === 0) {
+    return { set: 1, star: 1 };
+  }
+
+  // 🤔 中間（設定2寄り）
+  return { set: 2, star: 2 };
 }
 
 function render() {
