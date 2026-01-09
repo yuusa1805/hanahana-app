@@ -9,10 +9,16 @@
     h1,h2 { margin:10px 0; }
     input,select,button { width:100%; padding:8px; margin:5px 0; font-size:16px; }
     button { background:#333; color:#fff; border:none; border-radius:4px; }
-    .card { background:#fff; padding:10px; margin:10px 0; border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,.1); }
+    .card {
+      background:#fff; padding:10px; margin:10px 0;
+      border-radius:6px; box-shadow:0 2px 5px rgba(0,0,0,.1);
+    }
     .small { font-size:12px; color:#666; }
     .red { color:#d00; font-weight:bold; }
-    .aim-label { background:gold; padding:4px; text-align:center; margin-top:6px; border-radius:4px; font-weight:bold; }
+    .aim-label {
+      background:gold; padding:4px; text-align:center;
+      margin-top:6px; border-radius:4px; font-weight:bold;
+    }
     .delete { background:#c00; margin-top:6px; }
   </style>
 </head>
@@ -20,16 +26,17 @@
 
 <h1>🌺 ハナハナ設定判別</h1>
 
-<select id="mode">
+<!-- ★ モード切替：変更時に即再描画 -->
+<select id="mode" onchange="render()">
   <option value="open">営業中モード</option>
   <option value="close">閉店後モード</option>
 </select>
 
 <input id="date" type="date">
-<input id="machine" placeholder="台番号" type="number">
-<input id="games" placeholder="総回転数" type="number">
-<input id="bb" placeholder="BB回数" type="number">
-<input id="rb" placeholder="RB回数" type="number">
+<input id="machine" type="number" placeholder="台番号">
+<input id="games" type="number" placeholder="総回転数">
+<input id="bb" type="number" placeholder="BB回数">
+<input id="rb" type="number" placeholder="RB回数">
 
 <button onclick="saveData()">保存</button>
 
@@ -60,7 +67,7 @@ function saveData() {
   render();
 }
 
-/* ===== 設定推定（修正版） ===== */
+/* ===== 設定推定（営業中は厳しめ） ===== */
 function estimateSetting(g, bb, rb, mode) {
   if (mode === "open" && g < 1500) return 0;
   if (mode === "close" && g < 3000) return 0;
@@ -96,7 +103,7 @@ function starCount(s) {
 /* ===== 削除 ===== */
 function deleteData(i) {
   if (!confirm("削除する？")) return;
-  data.splice(i,1);
+  data.splice(i, 1);
   localStorage.setItem("hanahanaData", JSON.stringify(data));
   render();
 }
@@ -136,39 +143,39 @@ function analyzeHallTrend() {
 function render() {
   const mode = document.getElementById("mode").value;
   const list = document.getElementById("list");
-  list.innerHTML="";
+  list.innerHTML = "";
 
   data.forEach((d,i)=>{
-    const total = d.bb+d.rb;
-    const gassan = total ? Math.floor(d.games/total) : "-";
-    const rbRate = d.rb ? Math.floor(d.games/d.rb) : "-";
+    const total = d.bb + d.rb;
+    const gassan = total ? Math.floor(d.games / total) : "-";
+    const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
 
     const set = estimateSetting(d.games,d.bb,d.rb,mode);
     const conf = confidence(d.games,d.rb,mode);
 
-    /* 🔥 狙い目は閉店後基準で固定 */
+    // 🔥 狙い目は「閉店後基準」で固定
     const aim =
       estimateSetting(d.games,d.bb,d.rb,"close") >= 4 &&
       starCount(confidence(d.games,d.rb,"close")) >= 4;
 
-    const card=document.createElement("div");
-    card.className="card";
-    card.innerHTML=`
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
       <div class="small">${d.date}</div>
       <div>台番号：${d.machine}</div>
       <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
       <div>合算：1/${gassan}</div>
       <div>RB：1/${rbRate}</div>
-      <div class="red">推定設定：${set||"判別不可"}</div>
+      <div class="red">推定設定：${set || "判別不可"}</div>
       <div>信頼度：${conf}</div>
-      ${aim?`<div class="aim-label">🔥 狙い目</div>`:""}
+      ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
       <button class="delete" onclick="deleteData(${i})">削除</button>
     `;
     list.appendChild(card);
   });
 
   const hall = analyzeHallTrend();
-  document.getElementById("hall").innerHTML=`
+  document.getElementById("hall").innerHTML = `
     <div class="card">
       <div>据え：${hall.keep}</div>
       <div>上げ：${hall.up}</div>
