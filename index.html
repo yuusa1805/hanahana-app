@@ -44,12 +44,22 @@ button.clear {
   border-color: red;
   background: #fff0f0;
 }
-.aim-label {
-  color: red;
+.keep {
+  border-color: orange;
+  background: #fff7e6;
+}
+.up {
+  border-color: green;
+  background: #eaffea;
+}
+
+.label {
   font-weight: bold;
   margin-top: 6px;
 }
 .red { color: red; font-weight: bold; }
+.orange { color: orange; }
+.green { color: green; }
 .gray { color: #777; }
 .small { font-size: 13px; color: #666; }
 </style>
@@ -87,7 +97,6 @@ const settings = [
   { s: 6, rb: 343, all: 134 }
 ];
 
-// 今日の日付を自動セット
 document.getElementById("date").value =
   new Date().toISOString().split("T")[0];
 
@@ -98,7 +107,7 @@ function saveData() {
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!date || !machine || !games || bb < 0 || rb < 0) {
+  if (!date || !machine || !games) {
     alert("全部入力してね");
     return;
   }
@@ -115,7 +124,6 @@ function clearData() {
   render();
 }
 
-/* ===== BB最低条件フィルター ===== */
 function invalidData(games, bb, mode) {
   if (mode === "close" && bb === 0) return true;
   if (games >= 5000 && bb < 8) return true;
@@ -143,27 +151,38 @@ function estimateSetting(games, bb, rb, mode) {
       best = st.s;
     }
   });
-
   return best;
 }
 
 function confidence(games, rb, mode) {
   if (mode === "close") {
-    if (games >= 5000 && rb >= 25) return "★★★★★";
-    if (games >= 4500 && rb >= 22) return "★★★★☆";
-    if (games >= 4000 && rb >= 18) return "★★★☆☆";
-    if (games >= 3000 && rb >= 14) return "★★☆☆☆";
+    if (games >= 5000 && rb >= 25) return 5;
+    if (games >= 4500 && rb >= 22) return 4;
+    if (games >= 4000 && rb >= 18) return 3;
+    if (games >= 3000 && rb >= 14) return 2;
   } else {
-    if (games >= 3000 && rb >= 15) return "★★★★★";
-    if (games >= 2500 && rb >= 12) return "★★★★☆";
-    if (games >= 2000 && rb >= 9) return "★★★☆☆";
-    if (games >= 1000 && rb >= 5) return "★★☆☆☆";
+    if (games >= 3000 && rb >= 15) return 5;
+    if (games >= 2500 && rb >= 12) return 4;
+    if (games >= 2000 && rb >= 9) return 3;
+    if (games >= 1000 && rb >= 5) return 2;
   }
-  return "★☆☆☆☆";
+  return 1;
 }
 
-function starCount(stars) {
-  return stars.replace(/☆/g, "").length;
+function judgeTrend(today, yesterday) {
+  if (!yesterday) return null;
+  if (today.setting === 0 || yesterday.setting === 0) return "判別不可";
+
+  if (yesterday.setting >= 4 && today.setting >= 4)
+    return "据え置き濃厚";
+
+  if (yesterday.setting <= 2 && today.setting >= 4)
+    return "上げ濃厚";
+
+  if (yesterday.setting >= 4 && today.setting <= 2)
+    return "下げ濃厚";
+
+  return "不明";
 }
 
 function render() {
@@ -171,39 +190,68 @@ function render() {
   const mode = document.getElementById("mode").value;
   list.innerHTML = "";
 
-  data
-    .sort((a, b) =>
-      a.machine !== b.machine
-        ? a.machine - b.machine
-        : a.date.localeCompare(b.date)
-    )
-    .forEach(d => {
-      const total = d.bb + d.rb;
-      const gassan = total ? Math.floor(d.games / total) : "-";
-      const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
+  const sorted = [...data].sort((a, b) =>
+    a.machine !== b.machine
+      ? a.machine - b.machine
+      : a.date.localeCompare(b.date)
+  );
 
-      const setting = estimateSetting(d.games, d.bb, d.rb, mode);
-      const conf = confidence(d.games, d.rb, mode);
-      const aim =
-        setting >= 4 &&
-        starCount(conf) >= 4 &&
-        setting !== 0;
+  sorted.forEach((d, i) => {
+    const total = d.bb + d.rb;
+    const gassan = total ? Math.floor(d.games / total) : "-";
+    const rbRate = d.rb ? Math.floor(d.games / d.rb) : "-";
 
-      const card = document.createElement("div");
-      card.className = "card" + (aim ? " aim" : "");
+    const setting = estimateSetting(d.games, d.bb, d.rb, mode);
+    const conf = confidence(d.games, d.rb, mode);
 
-      card.innerHTML = `
-        <div class="small">${d.date}</div>
-        <div>台番号：${d.machine}</div>
-        <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
-        <div>合算：1/${gassan}</div>
-        <div>RB：1/${rbRate}</div>
-        <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
-        <div class="${setting === 0 ? "gray" : ""}">信頼度：${conf}</div>
-        ${aim ? `<div class="aim-label">🔥 狙い目</div>` : ""}
-      `;
-      list.appendChild(card);
-    });
+    const yesterday =
+      sorted[i - 1] &&
+      sorted[i - 1].machine === d.machine
+        ? sorted[i - 1]
+        : null;
+
+    const trend = judgeTrend(
+      { setting },
+      yesterday
+        ? {
+            setting: estimateSetting(
+              yesterday.games,
+              yesterday.bb,
+              yesterday.rb,
+              mode
+            )
+          }
+        : null
+    );
+
+    let cls = "card";
+    if (trend === "据え置き濃厚") cls += " keep";
+    if (trend === "上げ濃厚") cls += " up";
+
+    const card = document.createElement("div");
+    card.className = cls;
+
+    card.innerHTML = `
+      <div class="small">${d.date}</div>
+      <div>台番号：${d.machine}</div>
+      <div>${d.games}G / BB:${d.bb} RB:${d.rb}</div>
+      <div>合算：1/${gassan}　RB：1/${rbRate}</div>
+      <div class="red">推定設定：${setting === 0 ? "判別不可" : setting}</div>
+      <div>信頼度：${"★".repeat(conf)}${"☆".repeat(5 - conf)}</div>
+      ${
+        trend
+          ? `<div class="label ${
+              trend === "据え置き濃厚"
+                ? "orange"
+                : trend === "上げ濃厚"
+                ? "green"
+                : "gray"
+            }">🔮 ${trend}</div>`
+          : ""
+      }
+    `;
+    list.appendChild(card);
+  });
 }
 
 render();
