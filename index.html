@@ -2,197 +2,150 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>ハナハナ 閉店後分析</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<title>キングハナハナ 閉店後設定判別</title>
 <style>
 body {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f2f2f2;
+  background: #f5f5f5;
   margin: 0;
   padding: 16px;
 }
-
-h2 {
+h1 {
   text-align: center;
 }
-
-.section {
-  background: #fff;
-  padding: 16px;
-  border-radius: 12px;
-  margin-bottom: 16px;
-}
-
-label {
-  font-weight: bold;
-  display: block;
-  margin-top: 12px;
-}
-
-input {
+input, button {
   width: 100%;
-  font-size: 20px;
   padding: 14px;
-  margin-top: 4px;
-  box-sizing: border-box;
+  margin: 6px 0;
+  font-size: 16px;
 }
-
-.row {
-  display: flex;
-  gap: 12px;
-}
-
-.row input {
-  flex: 1;
-}
-
 button {
-  width: 100%;
-  font-size: 20px;
-  padding: 14px;
-  margin-top: 16px;
-  border: none;
-  border-radius: 10px;
-  background: #ff6b6b;
+  background: #ff4d4d;
   color: white;
+  border: none;
+  border-radius: 6px;
 }
-
-.item {
+.card {
   background: white;
-  padding: 14px;
-  border-radius: 10px;
-  margin-top: 12px;
+  padding: 16px;
+  margin-top: 16px;
+  border-radius: 8px;
 }
-
-.good {
+.result-strong {
   color: red;
   font-weight: bold;
-  margin-top: 6px;
+}
+.small {
+  color: #666;
+  font-size: 14px;
 }
 </style>
 </head>
-
 <body>
 
-<h2>🌺 ハナハナ 閉店後分析</h2>
+<h1>キングハナハナ<br>閉店後設定判別</h1>
 
-<div class="section">
-  <label>日付</label>
-  <input type="date" id="date">
+<input id="machine" placeholder="台番号">
+<input id="games" placeholder="総回転数">
+<input id="bb" placeholder="BIG回数">
+<input id="rb" placeholder="REG回数">
+<button onclick="analyze()">判別する</button>
 
-  <label>台番号</label>
-  <input id="machine" placeholder="例：303">
-
-  <label>総回転数</label>
-  <input id="games" type="number" placeholder="例：5200">
-
-  <div class="row">
-    <div>
-      <label>BB</label>
-      <input id="bb" type="number" placeholder="例：24">
-    </div>
-    <div>
-      <label>RB</label>
-      <input id="rb" type="number" placeholder="例：28">
-    </div>
-  </div>
-
-  <button onclick="saveData()">保存</button>
-</div>
-
-<div class="section">
-  <button onclick="clearData()">全データ削除</button>
-</div>
-
-<div id="list"></div>
+<div id="result"></div>
 
 <script>
-let data = JSON.parse(localStorage.getItem("hana_close_data")) || [];
+// 設定別確率（画像準拠）
+const settings = [
+  {s:1, bb:292, rb:489, sum:183},
+  {s:2, bb:280, rb:452, sum:172},
+  {s:3, bb:268, rb:420, sum:163},
+  {s:4, bb:257, rb:390, sum:154},
+  {s:5, bb:244, rb:360, sum:145},
+  {s:6, bb:232, rb:332, sum:136},
+];
 
-function saveData() {
-  const d = {
-    date: date.value,
-    machine: machine.value,
-    games: Number(games.value),
-    bb: Number(bb.value),
-    rb: Number(rb.value)
-  };
+function analyze() {
+  const machine = document.getElementById("machine").value;
+  const g = Number(document.getElementById("games").value);
+  const bb = Number(document.getElementById("bb").value);
+  const rb = Number(document.getElementById("rb").value);
 
-  if (!d.date || !d.machine || !d.games) {
-    alert("未入力があります");
+  if (!machine || !g || rb === 0) {
+    alert("台番号・回転数・REG回数は必須");
     return;
   }
 
-  data.push(d);
-  localStorage.setItem("hana_close_data", JSON.stringify(data));
-  render();
-}
+  const rbRate = g / rb;
+  const sumRate = g / (bb + rb);
+  const bbRate = bb > 0 ? g / bb : null;
 
-function clearData() {
-  if (confirm("本当に全削除する？")) {
-    data = [];
-    localStorage.removeItem("hana_close_data");
-    render();
-  }
-}
+  // 推定設定
+  let best = null;
+  let minDiff = Infinity;
 
-function judge(d) {
-  const total = d.bb + d.rb;
-  const rbRate = d.rb ? d.games / d.rb : Infinity;
-  const allRate = total ? d.games / total : Infinity;
+  settings.forEach(st => {
+    let diff =
+      Math.abs(rbRate - st.rb) * 0.6 +
+      Math.abs(sumRate - st.sum) * 0.3;
 
-  // 🔒 高設定ゾーン（厳しめ）
-  if (d.games >= 5000 && d.rb >= 20 && rbRate <= 200 && allRate <= 130) {
-    return { set: 6, star: 5 };
-  }
-  if (d.games >= 4000 && d.rb >= 16 && rbRate <= 230) {
-    return { set: 5, star: 4 };
-  }
-  if (d.games >= 3000 && d.rb >= 12 && rbRate <= 280) {
-    return { set: 4, star: 3 };
-  }
-
-  // ⚠️ 低信頼ゾーン（旧・判別不可）
-  if (d.games < 2000 || d.bb === 0) {
-    return { set: 1, star: 1 };
-  }
-
-  // 🤔 中間（設定2寄り）
-  return { set: 2, star: 2 };
-}
-
-function render() {
-  list.innerHTML = "";
-
-  data.forEach(d => {
-    const total = d.bb + d.rb;
-    const allRate = total ? `1/${Math.floor(d.games / total)}` : "-";
-    const rbRate = d.rb ? `1/${Math.floor(d.games / d.rb)}` : "-";
-
-    const j = judge(d);
-
-    let extra = "";
-    if (j.set >= 4) {
-      const level = j.set === 6 ? "強" : j.set === 5 ? "中" : "弱";
-      extra = `<div class="good">📊 高設定（${level}）</div>`;
+    if (bbRate) {
+      diff += Math.abs(bbRate - st.bb) * 0.1;
     }
 
-    list.innerHTML += `
-      <div class="item">
-        <b>${d.date}</b><br>
-        台番号：${d.machine}<br>
-        ${d.games}G / BB:${d.bb} RB:${d.rb}<br>
-        合算：${allRate}　RB：${rbRate}<br>
-        推定設定：${j.set}<br>
-        信頼度：${"★".repeat(j.star)}${"☆".repeat(5 - j.star)}
-        ${extra}
-      </div>
-    `;
+    if (diff < minDiff) {
+      minDiff = diff;
+      best = st;
+    }
   });
-}
 
-render();
+  // 信頼度計算（100点）
+  let score = 0;
+
+  // 回転数（最大60）
+  if (g >= 8000) score += 60;
+  else if (g >= 5000) score += 50;
+  else if (g >= 3000) score += 35;
+  else if (g >= 1500) score += 20;
+  else score += 10;
+
+  // REG（最大30）
+  if (rb >= 30) score += 30;
+  else if (rb >= 25) score += 25;
+  else if (rb >= 20) score += 20;
+  else if (rb >= 15) score += 15;
+  else if (rb >= 10) score += 10;
+  else if (rb >= 5) score += 5;
+
+  // BIG（最大10）
+  if (bb >= 25) score += 10;
+  else if (bb >= 20) score += 8;
+  else if (bb >= 15) score += 6;
+  else if (bb >= 10) score += 4;
+  else if (bb >= 5) score += 2;
+
+  let stars = "★☆☆☆☆";
+  if (score >= 85) stars = "★★★★★";
+  else if (score >= 70) stars = "★★★★☆";
+  else if (score >= 50) stars = "★★★☆☆";
+  else if (score >= 30) stars = "★★☆☆☆";
+
+  document.getElementById("result").innerHTML = `
+    <div class="card">
+      <b>台番号：</b>${machine}<br>
+      <b>${g}G / BB:${bb} RB:${rb}</b><br><br>
+
+      合算：1/${Math.round(sumRate)}<br>
+      REG：1/${Math.round(rbRate)}<br><br>
+
+      <span class="result-strong">
+        推定設定：${best.s}
+      </span><br>
+      信頼度：${stars}<br>
+      <div class="small">（スコア：${score}/100）</div>
+    </div>
+  `;
+}
 </script>
 
 </body>
