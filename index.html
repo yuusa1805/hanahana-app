@@ -39,7 +39,7 @@ input {
 
 button {
   width: 100%;
-  margin-top: 16px;
+  margin-top: 12px;
   padding: 14px;
   font-size: 18px;
   border: none;
@@ -48,10 +48,22 @@ button {
   color: white;
 }
 
-.result {
+.list {
   margin-top: 16px;
-  line-height: 1.6;
-  font-size: 16px;
+}
+
+.item {
+  background: #fff;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+
+.delete {
+  margin-top: 6px;
+  background: #f44336;
+  font-size: 14px;
 }
 </style>
 </head>
@@ -61,6 +73,9 @@ button {
 <h1>キングハナハナ<br>設定推定（閉店後）</h1>
 
 <div class="card">
+  <label>日付</label>
+  <input id="date" type="date">
+
   <label>台番号</label>
   <input id="machine" type="number">
 
@@ -73,14 +88,14 @@ button {
   <label>RB回数</label>
   <input id="rb" type="number">
 
-  <button onclick="analyze()">判定する</button>
-
-  <div id="result" class="result"></div>
+  <button onclick="saveData()">保存する</button>
 </div>
 
+<div class="list" id="list"></div>
+
 <script>
-// ===== 設定データ（キングハナハナ） =====
-const settings = [
+// ===== データ =====
+const SETTINGS = [
   { s:1, g:183, rb:273 },
   { s:2, g:172, rb:256 },
   { s:3, g:163, rb:240 },
@@ -89,27 +104,28 @@ const settings = [
   { s:6, g:136, rb:192 }
 ];
 
-// ===== メイン処理 =====
-function analyze() {
+let data = JSON.parse(localStorage.getItem("hanaData")) || [];
+
+// ===== 保存 =====
+function saveData() {
+  const date = document.getElementById("date").value;
   const machine = document.getElementById("machine").value;
   const games = Number(document.getElementById("games").value);
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!games || (bb + rb) === 0) {
-    alert("データを正しく入力してね");
+  if (!date || !machine || !games) {
+    alert("日付・台番号・回転数は必須だよ");
     return;
   }
 
   const total = bb + rb;
   const gassan = games / total;
-  const rbRate = rb > 0 ? games / rb : Infinity;
 
-  // --- 推定設定（合算のみ） ---
-  let est = settings[0];
+  // 推定設定
+  let est = SETTINGS[0];
   let diff = Math.abs(gassan - est.g);
-
-  settings.forEach(s => {
+  SETTINGS.forEach(s => {
     const d = Math.abs(gassan - s.g);
     if (d < diff) {
       diff = d;
@@ -117,37 +133,64 @@ function analyze() {
     }
   });
 
-  // --- 信頼度（ゲーム数のみ） ---
-  const trustPercent = Math.min(games / 8000 * 100, 100);
+  // 信頼度（★）
+  const trust = Math.min(games / 8000 * 100, 100);
   const stars =
-    trustPercent >= 80 ? "★★★★★" :
-    trustPercent >= 65 ? "★★★★☆" :
-    trustPercent >= 50 ? "★★★☆☆" :
-    trustPercent >= 35 ? "★★☆☆☆" :
-                         "★☆☆☆☆";
+    trust >= 80 ? "★★★★★" :
+    trust >= 65 ? "★★★★☆" :
+    trust >= 50 ? "★★★☆☆" :
+    trust >= 35 ? "★★☆☆☆" :
+                  "★☆☆☆☆";
 
-  // --- REG評価（記号） ---
-  let regMark = "✕✕";
+  // REG評価
+  let reg = "✕✕";
   if (rb > 0) {
-    const ratio = est.rb / rbRate;
-    if (ratio >= 1.0) regMark = "◎";
-    else if (ratio >= 0.85) regMark = "○";
-    else if (ratio >= 0.70) regMark = "△";
-    else if (ratio >= 0.55) regMark = "×";
+    const ratio = est.rb / (games / rb);
+    if (ratio >= 1.0) reg = "◎";
+    else if (ratio >= 0.85) reg = "○";
+    else if (ratio >= 0.70) reg = "△";
+    else if (ratio >= 0.55) reg = "×";
   }
 
-  // --- 表示 ---
-  document.getElementById("result").innerHTML = `
-  台番号：${machine}<br>
-  総回転数：${games}G<br>
-  BB：${bb} / RB：${rb}<br><br>
+  data.push({
+    date, machine, games, bb, rb,
+    est: est.s,
+    gassan: gassan.toFixed(1),
+    stars,
+    reg
+  });
 
-  合算：1/${gassan.toFixed(1)}<br>
-  推定設定：${est.s}<br>
-  信頼度：${stars}<br>
-  REG評価：${regMark}
-  `;
+  localStorage.setItem("hanaData", JSON.stringify(data));
+  render();
 }
+
+// ===== 表示 =====
+function render() {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  data.forEach((d, i) => {
+    const div = document.createElement("div");
+    div.className = "item";
+    div.innerHTML = `
+      📅 ${d.date} / 台 ${d.machine}<br>
+      ${d.games}G BB:${d.bb} RB:${d.rb}<br>
+      合算 1/${d.gassan}｜設定${d.est}<br>
+      信頼度 ${d.stars}｜REG ${d.reg}
+      <button class="delete" onclick="remove(${i})">削除</button>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// ===== 削除 =====
+function remove(i) {
+  data.splice(i, 1);
+  localStorage.setItem("hanaData", JSON.stringify(data));
+  render();
+}
+
+render();
 </script>
 
 </body>
