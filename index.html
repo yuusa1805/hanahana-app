@@ -4,65 +4,70 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>キングハナハナ 閉店後設定判別</title>
+
 <style>
 body {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f5f5f5;
-  margin: 0;
-  padding: 16px;
+  background:#f4f4f4;
+  margin:0;
+  padding:16px;
 }
 h1 {
-  text-align: center;
+  text-align:center;
+  margin-bottom:10px;
 }
 input, button {
-  width: 100%;
-  padding: 14px;
-  margin: 6px 0;
-  font-size: 16px;
+  width:100%;
+  padding:14px;
+  font-size:16px;
+  margin-top:8px;
 }
 button {
-  background: #ff4d4d;
-  color: white;
-  border: none;
-  border-radius: 6px;
+  background:#e53935;
+  color:#fff;
+  border:none;
+  border-radius:8px;
 }
 .card {
-  background: white;
-  padding: 16px;
-  margin-top: 16px;
-  border-radius: 8px;
+  background:#fff;
+  margin-top:16px;
+  padding:16px;
+  border-radius:10px;
 }
-.result-strong {
-  color: red;
-  font-weight: bold;
+.setting {
+  font-size:22px;
+  font-weight:bold;
+  color:#d32f2f;
 }
 .small {
-  color: #666;
-  font-size: 14px;
+  font-size:13px;
+  color:#666;
 }
 </style>
 </head>
+
 <body>
 
 <h1>キングハナハナ<br>閉店後設定判別</h1>
 
 <input id="machine" placeholder="台番号">
-<input id="games" placeholder="総回転数">
-<input id="bb" placeholder="BIG回数">
-<input id="rb" placeholder="REG回数">
+<input id="games" placeholder="総回転数（G）" type="number">
+<input id="bb" placeholder="BIG回数" type="number">
+<input id="rb" placeholder="REG回数" type="number">
+
 <button onclick="analyze()">判別する</button>
 
 <div id="result"></div>
 
 <script>
-// 設定別確率（画像準拠）
+// 公式確率
 const settings = [
   {s:1, bb:292, rb:489, sum:183},
   {s:2, bb:280, rb:452, sum:172},
   {s:3, bb:268, rb:420, sum:163},
   {s:4, bb:257, rb:390, sum:154},
   {s:5, bb:244, rb:360, sum:145},
-  {s:6, bb:232, rb:332, sum:136},
+  {s:6, bb:232, rb:332, sum:136}
 ];
 
 function analyze() {
@@ -71,27 +76,22 @@ function analyze() {
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!machine || !g || rb === 0) {
-    alert("台番号・回転数・REG回数は必須");
+  if (!machine || g <= 0 || rb <= 0) {
+    alert("台番号・回転数・REG回数は必須です");
     return;
   }
 
   const rbRate = g / rb;
   const sumRate = g / (bb + rb);
-  const bbRate = bb > 0 ? g / bb : null;
 
-  // 推定設定
-  let best = null;
+  // 推定設定（RB + 合算）
+  let best = settings[0];
   let minDiff = Infinity;
 
   settings.forEach(st => {
-    let diff =
+    const diff =
       Math.abs(rbRate - st.rb) * 0.6 +
-      Math.abs(sumRate - st.sum) * 0.3;
-
-    if (bbRate) {
-      diff += Math.abs(bbRate - st.bb) * 0.1;
-    }
+      Math.abs(sumRate - st.sum) * 0.4;
 
     if (diff < minDiff) {
       minDiff = diff;
@@ -99,14 +99,14 @@ function analyze() {
     }
   });
 
-  // 信頼度計算（100点）
+  // 信頼度スコア
   let score = 0;
 
-  // 回転数（最大60）
-  if (g >= 8000) score += 60;
-  else if (g >= 5000) score += 50;
-  else if (g >= 3000) score += 35;
-  else if (g >= 1500) score += 20;
+  // 回転数（最大50）
+  if (g >= 8000) score += 50;
+  else if (g >= 6000) score += 40;
+  else if (g >= 4000) score += 30;
+  else if (g >= 2000) score += 20;
   else score += 10;
 
   // REG（最大30）
@@ -117,18 +117,20 @@ function analyze() {
   else if (rb >= 10) score += 10;
   else if (rb >= 5) score += 5;
 
-  // BIG（最大10）
-  if (bb >= 25) score += 10;
-  else if (bb >= 20) score += 8;
-  else if (bb >= 15) score += 6;
-  else if (bb >= 10) score += 4;
-  else if (bb >= 5) score += 2;
+  // BIG（最大20）
+  if (bb >= 35) score += 20;
+  else if (bb >= 30) score += 18;
+  else if (bb >= 25) score += 15;
+  else if (bb >= 20) score += 12;
+  else if (bb >= 15) score += 8;
+  else if (bb >= 10) score += 5;
 
+  // 星表示
   let stars = "★☆☆☆☆";
-  if (score >= 85) stars = "★★★★★";
-  else if (score >= 70) stars = "★★★★☆";
-  else if (score >= 50) stars = "★★★☆☆";
-  else if (score >= 30) stars = "★★☆☆☆";
+  if (score >= 80) stars = "★★★★★";
+  else if (score >= 60) stars = "★★★★☆";
+  else if (score >= 40) stars = "★★★☆☆";
+  else if (score >= 20) stars = "★★☆☆☆";
 
   document.getElementById("result").innerHTML = `
     <div class="card">
@@ -138,11 +140,9 @@ function analyze() {
       合算：1/${Math.round(sumRate)}<br>
       REG：1/${Math.round(rbRate)}<br><br>
 
-      <span class="result-strong">
-        推定設定：${best.s}
-      </span><br>
+      <div class="setting">推定設定：${best.s}</div>
       信頼度：${stars}<br>
-      <div class="small">（スコア：${score}/100）</div>
+      <div class="small">スコア：${score} / 100</div>
     </div>
   `;
 }
