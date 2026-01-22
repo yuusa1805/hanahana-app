@@ -12,10 +12,7 @@ body {
   margin: 0;
   padding: 16px;
 }
-
-h1 {
-  text-align: center;
-}
+h1 { text-align: center; }
 
 .card {
   background: #fff;
@@ -48,9 +45,7 @@ button {
   color: white;
 }
 
-.list {
-  margin-top: 16px;
-}
+.list { margin-top: 16px; }
 
 .item {
   background: #fff;
@@ -97,6 +92,9 @@ button {
     <option value="">すべて表示</option>
   </select>
 
+  <label>台番号フィルタ</label>
+  <input id="filterMachine" type="number" placeholder="例：101" oninput="render()">
+
   <label>並び順</label>
   <select id="sortType" onchange="render()">
     <option value="machine">台番号順</option>
@@ -135,27 +133,20 @@ function saveData() {
   const total = bb + rb;
   const gassan = games / total;
 
-  // 推定設定（合算のみ）
   let est = SETTINGS[0];
   let diff = Math.abs(gassan - est.g);
   SETTINGS.forEach(s => {
     const d = Math.abs(gassan - s.g);
-    if (d < diff) {
-      diff = d;
-      est = s;
-    }
+    if (d < diff) { diff = d; est = s; }
   });
 
-  // 信頼度（★）
   const trust = Math.min(games / 8000 * 100, 100);
   const stars =
     trust >= 80 ? "★★★★★" :
     trust >= 65 ? "★★★★☆" :
     trust >= 50 ? "★★★☆☆" :
-    trust >= 35 ? "★★☆☆☆" :
-                  "★☆☆☆☆";
+    trust >= 35 ? "★★☆☆☆" : "★☆☆☆☆";
 
-  // REG評価
   let reg = "✕✕";
   if (rb > 0) {
     const ratio = est.rb / (games / rb);
@@ -197,16 +188,19 @@ function render() {
   list.innerHTML = "";
 
   const filterDate = document.getElementById("filterDate").value;
+  const filterMachine = document.getElementById("filterMachine").value;
   const sortType = document.getElementById("sortType").value;
 
   let view = data.slice();
 
-  // 日付フィルタ
   if (filterDate) {
     view = view.filter(d => d.date === filterDate);
   }
 
-  // 並び替え
+  if (filterMachine) {
+    view = view.filter(d => d.machine == filterMachine);
+  }
+
   if (sortType === "machine") {
     view.sort((a, b) => a.machine - b.machine);
   } else {
