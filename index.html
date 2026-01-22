@@ -3,147 +3,149 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>キングハナハナ 閉店後設定判別</title>
+<title>キングハナハナ 設定推定（閉店後）</title>
 
 <style>
 body {
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-  background:#f4f4f4;
-  margin:0;
-  padding:16px;
+  background: #f5f5f5;
+  margin: 0;
+  padding: 16px;
 }
+
 h1 {
-  text-align:center;
-  margin-bottom:10px;
+  text-align: center;
 }
-input, button {
-  width:100%;
-  padding:14px;
-  font-size:16px;
-  margin-top:8px;
-}
-button {
-  background:#e53935;
-  color:#fff;
-  border:none;
-  border-radius:8px;
-}
+
 .card {
-  background:#fff;
-  margin-top:16px;
-  padding:16px;
-  border-radius:10px;
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 16px;
 }
-.setting {
-  font-size:22px;
-  font-weight:bold;
-  color:#d32f2f;
+
+label {
+  display: block;
+  margin-top: 12px;
+  font-weight: bold;
 }
-.small {
-  font-size:13px;
-  color:#666;
+
+input {
+  width: 100%;
+  font-size: 18px;
+  padding: 10px;
+  margin-top: 4px;
+}
+
+button {
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px;
+  font-size: 18px;
+  border: none;
+  border-radius: 10px;
+  background: #4caf50;
+  color: white;
+}
+
+.result {
+  margin-top: 16px;
+  line-height: 1.6;
+  font-size: 16px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>キングハナハナ<br>閉店後設定判別</h1>
+<h1>キングハナハナ<br>設定推定（閉店後）</h1>
 
-<input id="machine" placeholder="台番号">
-<input id="games" placeholder="総回転数（G）" type="number">
-<input id="bb" placeholder="BIG回数" type="number">
-<input id="rb" placeholder="REG回数" type="number">
+<div class="card">
+  <label>台番号</label>
+  <input id="machine" type="number">
 
-<button onclick="analyze()">判別する</button>
+  <label>総回転数（G）</label>
+  <input id="games" type="number">
 
-<div id="result"></div>
+  <label>BB回数</label>
+  <input id="bb" type="number">
+
+  <label>RB回数</label>
+  <input id="rb" type="number">
+
+  <button onclick="analyze()">判定する</button>
+
+  <div id="result" class="result"></div>
+</div>
 
 <script>
-// 公式確率
+// ===== 設定データ（キングハナハナ） =====
 const settings = [
-  {s:1, bb:292, rb:489, sum:183},
-  {s:2, bb:280, rb:452, sum:172},
-  {s:3, bb:268, rb:420, sum:163},
-  {s:4, bb:257, rb:390, sum:154},
-  {s:5, bb:244, rb:360, sum:145},
-  {s:6, bb:232, rb:332, sum:136}
+  { s:1, g:183, rb:273 },
+  { s:2, g:172, rb:256 },
+  { s:3, g:163, rb:240 },
+  { s:4, g:154, rb:224 },
+  { s:5, g:145, rb:208 },
+  { s:6, g:136, rb:192 }
 ];
 
+// ===== メイン処理 =====
 function analyze() {
   const machine = document.getElementById("machine").value;
-  const g = Number(document.getElementById("games").value);
+  const games = Number(document.getElementById("games").value);
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
 
-  if (!machine || g <= 0 || rb <= 0) {
-    alert("台番号・回転数・REG回数は必須です");
+  if (!games || (bb + rb) === 0) {
+    alert("データを正しく入力してね");
     return;
   }
 
-  const rbRate = g / rb;
-  const sumRate = g / (bb + rb);
+  const total = bb + rb;
+  const gassan = games / total;
+  const rbRate = rb > 0 ? games / rb : Infinity;
 
-  // 推定設定（RB + 合算）
-  let best = settings[0];
-  let minDiff = Infinity;
+  // --- 推定設定（合算のみ） ---
+  let est = settings[0];
+  let diff = Math.abs(gassan - est.g);
 
-  settings.forEach(st => {
-    const diff =
-      Math.abs(rbRate - st.rb) * 0.6 +
-      Math.abs(sumRate - st.sum) * 0.4;
-
-    if (diff < minDiff) {
-      minDiff = diff;
-      best = st;
+  settings.forEach(s => {
+    const d = Math.abs(gassan - s.g);
+    if (d < diff) {
+      diff = d;
+      est = s;
     }
   });
 
-  // 信頼度スコア
-  let score = 0;
+  // --- 信頼度（ゲーム数のみ） ---
+  const trustPercent = Math.min(games / 8000 * 100, 100);
+  const stars =
+    trustPercent >= 80 ? "★★★★★" :
+    trustPercent >= 65 ? "★★★★☆" :
+    trustPercent >= 50 ? "★★★☆☆" :
+    trustPercent >= 35 ? "★★☆☆☆" :
+                         "★☆☆☆☆";
 
-  // 回転数（最大50）
-  if (g >= 8000) score += 50;
-  else if (g >= 6000) score += 40;
-  else if (g >= 4000) score += 30;
-  else if (g >= 2000) score += 20;
-  else score += 10;
+  // --- REG評価（記号） ---
+  let regMark = "✕✕";
+  if (rb > 0) {
+    const ratio = est.rb / rbRate;
+    if (ratio >= 1.0) regMark = "◎";
+    else if (ratio >= 0.85) regMark = "○";
+    else if (ratio >= 0.70) regMark = "△";
+    else if (ratio >= 0.55) regMark = "×";
+  }
 
-  // REG（最大30）
-  if (rb >= 30) score += 30;
-  else if (rb >= 25) score += 25;
-  else if (rb >= 20) score += 20;
-  else if (rb >= 15) score += 15;
-  else if (rb >= 10) score += 10;
-  else if (rb >= 5) score += 5;
-
-  // BIG（最大20）
-  if (bb >= 35) score += 20;
-  else if (bb >= 30) score += 18;
-  else if (bb >= 25) score += 15;
-  else if (bb >= 20) score += 12;
-  else if (bb >= 15) score += 8;
-  else if (bb >= 10) score += 5;
-
-  // 星表示
-  let stars = "★☆☆☆☆";
-  if (score >= 80) stars = "★★★★★";
-  else if (score >= 60) stars = "★★★★☆";
-  else if (score >= 40) stars = "★★★☆☆";
-  else if (score >= 20) stars = "★★☆☆☆";
-
+  // --- 表示 ---
   document.getElementById("result").innerHTML = `
-    <div class="card">
-      <b>台番号：</b>${machine}<br>
-      <b>${g}G / BB:${bb} RB:${rb}</b><br><br>
+  台番号：${machine}<br>
+  総回転数：${games}G<br>
+  BB：${bb} / RB：${rb}<br><br>
 
-      合算：1/${Math.round(sumRate)}<br>
-      REG：1/${Math.round(rbRate)}<br><br>
-
-      <div class="setting">推定設定：${best.s}</div>
-      信頼度：${stars}<br>
-      <div class="small">スコア：${score} / 100</div>
-    </div>
+  合算：1/${gassan.toFixed(1)}<br>
+  推定設定：${est.s}<br>
+  信頼度：${stars}<br>
+  REG評価：${regMark}
   `;
 }
 </script>
