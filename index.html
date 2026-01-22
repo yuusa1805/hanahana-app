@@ -30,7 +30,7 @@ label {
   font-weight: bold;
 }
 
-input {
+input, select {
   width: 100%;
   font-size: 18px;
   padding: 10px;
@@ -91,10 +91,23 @@ button {
   <button onclick="saveData()">保存する</button>
 </div>
 
+<div class="card">
+  <label>表示する日付</label>
+  <select id="filterDate" onchange="render()">
+    <option value="">すべて表示</option>
+  </select>
+
+  <label>並び順</label>
+  <select id="sortType" onchange="render()">
+    <option value="machine">台番号順</option>
+    <option value="setting">設定順</option>
+  </select>
+</div>
+
 <div class="list" id="list"></div>
 
 <script>
-// ===== データ =====
+// ===== 設定データ =====
 const SETTINGS = [
   { s:1, g:183, rb:273 },
   { s:2, g:172, rb:256 },
@@ -109,7 +122,7 @@ let data = JSON.parse(localStorage.getItem("hanaData")) || [];
 // ===== 保存 =====
 function saveData() {
   const date = document.getElementById("date").value;
-  const machine = document.getElementById("machine").value;
+  const machine = Number(document.getElementById("machine").value);
   const games = Number(document.getElementById("games").value);
   const bb = Number(document.getElementById("bb").value);
   const rb = Number(document.getElementById("rb").value);
@@ -122,7 +135,7 @@ function saveData() {
   const total = bb + rb;
   const gassan = games / total;
 
-  // 推定設定
+  // 推定設定（合算のみ）
   let est = SETTINGS[0];
   let diff = Math.abs(gassan - est.g);
   SETTINGS.forEach(s => {
@@ -156,12 +169,26 @@ function saveData() {
     date, machine, games, bb, rb,
     est: est.s,
     gassan: gassan.toFixed(1),
-    stars,
-    reg
+    stars, reg
   });
 
   localStorage.setItem("hanaData", JSON.stringify(data));
+  updateDateFilter();
   render();
+}
+
+// ===== 日付フィルタ更新 =====
+function updateDateFilter() {
+  const select = document.getElementById("filterDate");
+  const dates = [...new Set(data.map(d => d.date))];
+
+  select.innerHTML = `<option value="">すべて表示</option>`;
+  dates.forEach(d => {
+    const opt = document.createElement("option");
+    opt.value = d;
+    opt.textContent = d;
+    select.appendChild(opt);
+  });
 }
 
 // ===== 表示 =====
@@ -169,7 +196,24 @@ function render() {
   const list = document.getElementById("list");
   list.innerHTML = "";
 
-  data.forEach((d, i) => {
+  const filterDate = document.getElementById("filterDate").value;
+  const sortType = document.getElementById("sortType").value;
+
+  let view = data.slice();
+
+  // 日付フィルタ
+  if (filterDate) {
+    view = view.filter(d => d.date === filterDate);
+  }
+
+  // 並び替え
+  if (sortType === "machine") {
+    view.sort((a, b) => a.machine - b.machine);
+  } else {
+    view.sort((a, b) => b.est - a.est);
+  }
+
+  view.forEach((d, i) => {
     const div = document.createElement("div");
     div.className = "item";
     div.innerHTML = `
@@ -177,19 +221,21 @@ function render() {
       ${d.games}G BB:${d.bb} RB:${d.rb}<br>
       合算 1/${d.gassan}｜設定${d.est}<br>
       信頼度 ${d.stars}｜REG ${d.reg}
-      <button class="delete" onclick="remove(${i})">削除</button>
+      <button class="delete" onclick="removeData(${i})">削除</button>
     `;
     list.appendChild(div);
   });
 }
 
 // ===== 削除 =====
-function remove(i) {
-  data.splice(i, 1);
+function removeData(index) {
+  data.splice(index, 1);
   localStorage.setItem("hanaData", JSON.stringify(data));
+  updateDateFilter();
   render();
 }
 
+updateDateFilter();
 render();
 </script>
 
